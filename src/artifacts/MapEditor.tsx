@@ -5,6 +5,7 @@ import { terrainTypes, DEFAULT_MAP_SIZE, DEFAULT_GENERATION_PARAMS, DEFAULT_CELL
 import { updateCells, fillMap, createEmptyMap, calculateCellSize } from './utils/mapUtils';
 import { generateRandomTerrain } from './utils/terrainGeneration';
 import { setupThreeScene, setupCameraControls, createMapMesh, cleanupThreeResources } from './utils/threeUtils';
+import { exportMapToJSON, importMapFromJSON } from '../lib/jsonUtils';
 import GenerationParamsDialog from './components/GenerationParamsDialog';
 import HelpDialog from './components/HelpDialog';
 import './styles/brushStyles.css';
@@ -514,11 +515,55 @@ const MapEditor: React.FC = () => {
   // Export to JSON
   const exportToJSON = () => {
     try {
-      // Toggle JSON display mode
-      setShowJsonExport(true);
+      // Экспортируем карту в JSON файл
+      exportMapToJSON(mapData, mapSize, `map-${mapSize.width}x${mapSize.height}-${new Date().toISOString().slice(0, 10)}.json`);
     } catch (error) {
       console.error('Error exporting map:', error);
       alert('An error occurred while exporting the map.');
+    }
+  };
+
+  // View JSON in interface
+  const viewJSON = () => {
+    try {
+      // Toggle JSON display mode
+      setShowJsonExport(true);
+    } catch (error) {
+      console.error('Error displaying JSON:', error);
+      alert('An error occurred while displaying the JSON.');
+    }
+  };
+
+  // Import from JSON
+  const importFromJSON = async () => {
+    try {
+      setIsLoading(true);
+      setLoadingMessage('Загрузка карты из JSON...');
+      
+      const importedMap = await importMapFromJSON();
+      
+      // Обновляем размер карты и данные
+      setMapSize({
+        width: importedMap.width,
+        height: importedMap.height
+      });
+      
+      setMapData(importedMap.data);
+      
+      // Очищаем стеки undo/redo
+      setUndoStack([]);
+      setRedoStack([]);
+      
+      // Если мы находимся на шаге выбора размера, переходим к редактированию
+      if (step === 'size') {
+        setStep('edit');
+      }
+      
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Error importing map:', error);
+      alert(`Ошибка при импорте карты: ${error}`);
+      setIsLoading(false);
     }
   };
 
@@ -972,9 +1017,9 @@ const MapEditor: React.FC = () => {
           backgroundSize: 'cover',
           filter: `brightness(${0.8 + 0.2 * (cell.height / 10)})`
         }}
-        onMouseDown={(e) => handleMouseDown(rowIndex, colIndex)}
-        onMouseUp={handleMouseUp}
+        onMouseDown={() => handleMouseDown(rowIndex, colIndex)}
         onMouseOver={(e) => handleMouseOver(rowIndex, colIndex, e)}
+        onMouseUp={handleMouseUp}
         onMouseOut={handleMouseOut}
         title={`${terrainType?.name || 'Неизвестно'} (Высота: ${cell.height})`}
       >
@@ -1460,10 +1505,24 @@ const MapEditor: React.FC = () => {
                 </button>
                 
                 <button
-                  onClick={exportToJSON}
+                  onClick={viewJSON}
                   className="px-3 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 transition-colors"
                 >
-                  Экспорт в JSON
+                  Просмотреть JSON
+                </button>
+                
+                <button
+                  onClick={exportToJSON}
+                  className="px-3 py-1 rounded bg-blue-500 text-white hover:bg-blue-600 transition-colors ml-2"
+                >
+                  Скачать JSON
+                </button>
+                
+                <button
+                  onClick={importFromJSON}
+                  className="px-3 py-1 rounded bg-green-500 text-white hover:bg-green-600 transition-colors ml-2"
+                >
+                  Импорт из JSON
                 </button>
               </div>
             </div>
