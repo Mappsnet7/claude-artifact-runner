@@ -51,3 +51,17 @@ export interface MapSize {
     dx: number;
     dy: number;
   }
+
+  // Brush type definition
+  export interface BrushType {
+    id: string;
+    name: string;
+    description: string;
+  }
+
+  // Soft brush settings
+  export interface SoftBrushSettings {
+    falloffType: 'linear' | 'quadratic' | 'gaussian' | 'plateau';
+    strength: number; // 0-1, влияет на интенсивность эффекта
+    preserveTerrainType: boolean; // Сохранять ли тип территории при изменении высоты
+  }

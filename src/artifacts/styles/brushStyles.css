@@ -1,0 +1,208 @@
+/* Стили для элементов интерфейса мягкой кисти */
+
+.tool-section {
+  margin-bottom: 1rem;
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+  background-color: #f3f4f6;
+}
+
+.tool-section h3 {
+  margin-top: 0;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.brush-types {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.brush-type-btn {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.25rem;
+  background-color: #ffffff;
+  font-size: 0.875rem;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.brush-type-btn:hover {
+  background-color: #f9fafb;
+  border-color: #9ca3af;
+}
+
+.brush-type-btn.selected {
+  background-color: #4f46e5;
+  border-color: #4338ca;
+  color: #ffffff;
+}
+
+.brush-settings-btn {
+  width: 100%;
+  padding: 0.375rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.25rem;
+  background-color: #f3f4f6;
+  font-size: 0.875rem;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.brush-settings-btn:hover {
+  background-color: #e5e7eb;
+  border-color: #9ca3af;
+}
+
+/* Стили для диалога настроек мягкой кисти */
+.dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.dialog {
+  background-color: #ffffff;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 28rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+.dialog h2 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.form-group select,
+.form-group input[type="range"] {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.25rem;
+  background-color: #f9fafb;
+}
+
+.form-group input[type="checkbox"] {
+  margin-right: 0.5rem;
+}
+
+.dialog-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-top: 1.5rem;
+}
+
+.dialog-buttons button {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.dialog-buttons button:first-child {
+  background-color: #4f46e5;
+  color: #ffffff;
+}
+
+.dialog-buttons button:first-child:hover {
+  background-color: #4338ca;
+}
+
+.dialog-buttons button:last-child {
+  background-color: #f3f4f6;
+  color: #374151;
+}
+
+.dialog-buttons button:last-child:hover {
+  background-color: #e5e7eb;
+}
+
+/* Визуализация типов мягкой кисти */
+.brush-preview {
+  display: flex;
+  gap: 1rem;
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+
+.brush-preview-item {
+  flex: 1;
+  text-align: center;
+}
+
+.brush-preview-image {
+  width: 100%;
+  height: 60px;
+  background-color: #f3f4f6;
+  border-radius: 0.25rem;
+  margin-bottom: 0.25rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.brush-preview-image::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+.brush-preview-image.linear::after {
+  background-image: linear-gradient(to right, rgba(79, 70, 229, 0) 0%, rgba(79, 70, 229, 1) 50%, rgba(79, 70, 229, 0) 100%);
+}
+
+.brush-preview-image.quadratic::after {
+  background-image: radial-gradient(circle, rgba(79, 70, 229, 1) 0%, rgba(79, 70, 229, 0) 70%);
+}
+
+.brush-preview-image.gaussian::after {
+  background-image: radial-gradient(circle, rgba(79, 70, 229, 1) 0%, rgba(79, 70, 229, 0.7) 30%, rgba(79, 70, 229, 0) 70%);
+}
+
+.brush-preview-image.plateau::after {
+  background-image: radial-gradient(circle, rgba(79, 70, 229, 1) 0%, rgba(79, 70, 229, 1) 30%, rgba(79, 70, 229, 0) 70%);
+}
+
+.brush-preview-label {
+  font-size: 0.75rem;
+  color: #6b7280;
+} 

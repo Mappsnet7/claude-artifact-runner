@@ -83,7 +83,7 @@ export const createMapMesh = (
     }
     
     // Создание базовой геометрии для инстансинга
-    const boxGeometry = new THREE.BoxGeometry(0.95, 1, 0.95);
+    const boxGeometry = new THREE.BoxGeometry(1.0, 1, 1.0);
     
     // Создание материала
     const material = new THREE.MeshStandardMaterial({
@@ -268,10 +268,12 @@ export const setupThreeScene = (
   const gridHelper = new THREE.GridHelper(
     Math.max(mapSize.width, mapSize.height) * 2,
     Math.max(mapSize.width, mapSize.height) * 2,
-    0x888888,
-    0xcccccc
+    0x88888822,
+    0xcccccc22
   );
   gridHelper.position.set(mapSize.width / 2, 0.01, mapSize.height / 2);
+  gridHelper.material.opacity = 0.2;
+  gridHelper.material.transparent = true;
   scene.add(gridHelper);
   
   return { scene, camera, renderer };

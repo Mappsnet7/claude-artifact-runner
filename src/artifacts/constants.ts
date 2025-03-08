@@ -1,4 +1,4 @@
-import { TerrainType } from './types';
+import { TerrainType, BrushType, SoftBrushSettings } from './types';
 import { createTexture } from './utils/textureUtils';
 
 // Terrain type definitions
@@ -10,6 +10,19 @@ export const terrainTypes: TerrainType[] = [
   { id: 'forest', name: 'Лес', color: '#33691E', baseHeight: 0.4, texture: createTexture('forest') },
   { id: 'asphalt', name: 'Асфальт', color: '#424242', baseHeight: 0.2, texture: createTexture('asphalt') }
 ];
+
+// Brush type definitions
+export const brushTypes: BrushType[] = [
+  { id: 'normal', name: 'Обычная', description: 'Стандартная кисть с равномерным эффектом' },
+  { id: 'soft', name: 'Мягкая', description: 'Кисть с плавным убыванием эффекта от центра к краям' }
+];
+
+// Default soft brush settings
+export const DEFAULT_SOFT_BRUSH_SETTINGS: SoftBrushSettings = {
+  falloffType: 'linear',
+  strength: 0.8,
+  preserveTerrainType: true
+};
 
 // Height levels from 0 to 10
 export const heightLevels: number[] = Array.from({ length: 11 }, (_, i) => i);
