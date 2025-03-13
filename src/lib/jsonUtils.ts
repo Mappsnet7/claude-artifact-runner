@@ -6,24 +6,25 @@ import { Cell, MapSize } from '../artifacts/types';
 export interface MapData {
   width: number;
   height: number;
-  data: Cell[][];
+  data: Record<string, Cell>;
   name?: string;
   description?: string;
   createdAt?: string;
   version?: string;
+  hexGrid?: boolean;
 }
 
 /**
  * Экспортирует данные карты в JSON файл
  * @param mapData Данные карты
  * @param mapSize Размер карты
- * @param fileName Имя файла (по умолчанию 'map-export.json')
+ * @param fileName Имя файла (по умолчанию 'hex-map-export.json')
  * @param additionalData Дополнительные данные для включения в экспорт
  */
 export const exportMapToJSON = (
-  mapData: Cell[][],
+  mapData: Record<string, Cell>,
   mapSize: MapSize,
-  fileName: string = 'map-export.json',
+  fileName: string = 'hex-map-export.json',
   additionalData: Partial<MapData> = {}
 ): void => {
   try {
@@ -33,7 +34,8 @@ export const exportMapToJSON = (
       height: mapSize.height,
       data: mapData,
       createdAt: new Date().toISOString(),
-      version: '1.0',
+      version: '2.0',
+      hexGrid: true, // Указываем, что это гексагональная сетка
       ...additionalData
     };
 
@@ -98,6 +100,26 @@ export const importMapFromJSON = (): Promise<MapData> => {
             if (!mapData.width || !mapData.height || !mapData.data) {
               reject(new Error('Некорректный формат файла JSON'));
               return;
+            }
+            
+            // Если импортируем старый формат (массив), преобразуем его
+            if (Array.isArray(mapData.data)) {
+              const oldData = mapData.data as unknown as Cell[][];
+              const newData: Record<string, Cell> = {};
+              
+              for (let r = 0; r < oldData.length; r++) {
+                for (let q = 0; q < oldData[r].length; q++) {
+                  const cell = oldData[r][q];
+                  newData[`${q},${r}`] = {
+                    ...cell,
+                    q,
+                    r
+                  };
+                }
+              }
+              
+              mapData.data = newData;
+              mapData.hexGrid = true; // Преобразуем в гексагональную сетку
             }
             
             resolve(mapData);
