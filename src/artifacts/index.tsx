@@ -1,6 +1,20 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import TerrainGeneratorPanel from './TerrainGeneratorPanel';
+import { 
+  FaDice, FaCog, FaMapMarkedAlt, FaChevronDown, FaChevronRight, 
+  FaPlay, FaInfoCircle, FaSave, FaRedo, FaUndo, FaEraser, 
+  FaTimes, FaUpload, FaDownload, FaSyncAlt, FaCube, FaPlus, 
+  FaMinus, FaRuler, FaChessKnight, FaTrash, FaEdit, FaCrosshairs,
+  FaFile, FaEye
+} from 'react-icons/fa';
+import { 
+  GiMountains, GiIsland, GiForest, GiSwamp, GiWaterDrop, 
+  GiHouse, GiHillFort
+} from 'react-icons/gi';
+import { RiMapFill, RiEarthLine, RiFileUploadLine } from 'react-icons/ri';
+import { BsPuzzle, BsGrid3X3Gap } from 'react-icons/bs';
 
 // Основные типы местности и их цвета
 const terrainTypes = [
@@ -139,6 +153,7 @@ const HexMapEditor = () => {
   const [editMode, setEditMode] = useState<'terrain' | 'units' | 'manage'>('terrain');
   const [manageAction, setManageAction] = useState<'add' | 'delete'>('add');
   const [selectedUnit, setSelectedUnit] = useState<typeof unitTypes[0] | null>(null);
+  const [showTerrainGenerator, setShowTerrainGenerator] = useState(false);
   
   // Состояния для управления видом 2D карты
   const [viewTransform, setViewTransform] = useState({ scale: 1, x: 0, y: 0 });
@@ -1285,9 +1300,25 @@ const HexMapEditor = () => {
     });
   };
 
+  // Функция для импорта сгенерированного ландшафта
+  const handleGeneratedTerrain = (
+    generatedMap: Array<{q: number; r: number; s: number; terrainType: string; color: string; height: number; unit?: {type: string; icon: string; color: string}}>,
+    generatedHexCount: number
+  ) => {
+    setHexMap(generatedMap);
+    setHexCount(generatedHexCount);
+    setShowSizeInput(false);
+    setShowTerrainGenerator(false);
+    // Сбрасываем трансформацию при создании новой карты
+    setViewTransform({ scale: 1, x: 0, y: 0 });
+  };
+
   return (
-    <div className="flex flex-col items-center w-full max-w-6xl mx-auto p-4 bg-gray-100 rounded-lg shadow-lg">
-      <h1 className="text-2xl font-bold mb-4">Редактор Гексагональных Карт</h1>
+    <div className="flex flex-col items-center w-full max-w-6xl mx-auto p-4 bg-gray-800 rounded-lg shadow-lg">
+      <h1 className="text-2xl font-bold mb-4 text-white flex items-center">
+        <RiMapFill className="mr-2 text-yellow-400" /> 
+        Редактор Гексагональных Карт
+      </h1>
       
       {showSizeInput ? (
         <div className="mb-6 p-6 bg-white rounded-lg shadow-md w-full max-w-md">
@@ -1320,12 +1351,20 @@ const HexMapEditor = () => {
                 <option value="pointy">Острым углом вверх</option>
               </select>
             </div>
-            <button
-              onClick={initializeMap}
-              className="mt-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-            >
-              {hexMap.length > 0 ? "Изменить размер" : "Создать карту"}
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={initializeMap}
+                className="mt-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+              >
+                {hexMap.length > 0 ? "Изменить размер" : "Создать пустую карту"}
+              </button>
+              <button
+                onClick={() => setShowTerrainGenerator(true)}
+                className="mt-4 bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded"
+              >
+                Сгенерировать ландшафт
+              </button>
+            </div>
           </div>
         </div>
       ) : (
@@ -1569,63 +1608,105 @@ const HexMapEditor = () => {
             )}
           </div>
           
-          <div className="mt-4 flex flex-wrap gap-4">
-            <button
-              onClick={() => setShow3DPreview(!show3DPreview)}
-              className="bg-purple-600 hover:bg-purple-800 text-white font-bold py-2 px-4 rounded"
-            >
-              {show3DPreview ? "Скрыть 3D предпросмотр" : "Показать 3D предпросмотр"}
-            </button>
+          <div className="mt-4 space-y-4">
+            {/* Группа для работы с файлами */}
+            <div className="bg-gray-700 p-3 rounded-lg shadow-inner">
+              <h3 className="text-white text-sm mb-2 font-semibold flex items-center">
+                <FaFile className="mr-2" /> Работа с файлами
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={importFromJSON}
+                    className="hidden"
+                    id="import-json"
+                  />
+                  <label
+                    htmlFor="import-json"
+                    className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 px-4 rounded-lg shadow-md flex items-center justify-center transition-all duration-200 transform hover:scale-105 cursor-pointer w-full h-full"
+                  >
+                    <FaUpload className="mr-2" />
+                    Загрузить карту
+                  </label>
+                </div>
+                <button
+                  onClick={exportToJSON}
+                  className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow-md flex items-center justify-center transition-all duration-200 transform hover:scale-105"
+                >
+                  <FaSave className="mr-2" />
+                  Экспорт в JSON
+                </button>
+              </div>
+            </div>
             
-            <button
-              onClick={exportToJSON}
-              className="bg-green-600 hover:bg-green-800 text-white font-bold py-2 px-4 rounded"
-            >
-              Экспорт в JSON
-            </button>
+            {/* Группа для просмотра и визуализации */}
+            <div className="bg-gray-700 p-3 rounded-lg shadow-inner">
+              <h3 className="text-white text-sm mb-2 font-semibold flex items-center">
+                <FaEye className="mr-2" /> Просмотр и генерация
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setShow3DPreview(!show3DPreview)}
+                  className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg shadow-md flex items-center justify-center transition-all duration-200 transform hover:scale-105"
+                >
+                  <FaCube className="mr-2" />
+                  {show3DPreview ? "Скрыть 3D" : "Показать 3D"}
+                </button>
+                <button
+                  onClick={() => setShowTerrainGenerator(!showTerrainGenerator)}
+                  className="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-lg shadow-md flex items-center justify-center transition-all duration-200 transform hover:scale-105"
+                >
+                  <RiEarthLine className="mr-2" />
+                  {showTerrainGenerator ? "Скрыть генератор" : "Генератор ландшафта"}
+                </button>
+              </div>
+            </div>
             
-            <button
-              onClick={() => setShowSizeInput(true)}
-              className="bg-blue-600 hover:bg-blue-800 text-white font-bold py-2 px-4 rounded"
-            >
-              Изменить размер карты
-            </button>
-            
-            <button
-              onClick={restoreDeletedHexes}
-              className="bg-teal-600 hover:bg-teal-800 text-white font-bold py-2 px-4 rounded"
-              title="Восстановить последние удаленные гексы"
-            >
-              Восстановить удаленные гексы
-            </button>
-            
-            <button
-              onClick={() => {
-                setHexMap([]);
-                setShowSizeInput(true);
-              }}
-              className="bg-red-600 hover:bg-red-800 text-white font-bold py-2 px-4 rounded"
-            >
-              Начать заново
-            </button>
-
-            <div className="relative">
-              <input
-                type="file"
-                accept=".json"
-                onChange={importFromJSON}
-                className="hidden"
-                id="import-json"
-              />
-              <label
-                htmlFor="import-json"
-                className="bg-yellow-600 hover:bg-yellow-800 text-white font-bold py-2 px-4 rounded cursor-pointer"
-              >
-                Загрузить карту
-              </label>
+            {/* Группа для редактирования карты */}
+            <div className="bg-gray-700 p-3 rounded-lg shadow-inner">
+              <h3 className="text-white text-sm mb-2 font-semibold flex items-center">
+                <FaEdit className="mr-2" /> Изменение карты
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setShowSizeInput(true)}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow-md flex items-center justify-center transition-all duration-200 transform hover:scale-105"
+                >
+                  <FaRuler className="mr-2" />
+                  Изменить размер
+                </button>
+                <button
+                  onClick={restoreDeletedHexes}
+                  className="bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-lg shadow-md flex items-center justify-center transition-all duration-200 transform hover:scale-105"
+                  title="Восстановить последние удаленные гексы"
+                >
+                  <FaUndo className="mr-2" />
+                  Восстановить гексы
+                </button>
+                <button
+                  onClick={() => {
+                    setHexMap([]);
+                    setShowSizeInput(true);
+                  }}
+                  className="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg shadow-md flex items-center justify-center transition-all duration-200 col-span-2 transform hover:scale-105"
+                >
+                  <FaTimes className="mr-2" />
+                  Начать заново
+                </button>
+              </div>
             </div>
           </div>
         </div>
+      )}
+      
+      {showTerrainGenerator && (
+        <TerrainGeneratorPanel
+          terrainTypes={terrainTypes}
+          onGenerateTerrain={handleGeneratedTerrain}
+          radius={mapRadius}
+        />
       )}
     </div>
   );
