@@ -12,17 +12,35 @@ const terrainTypes = [
   { id: 'asphalt', name: 'Асфальт', color: '#424242', height: -0.1 }
 ];
 
+// Типы шашек (военных юнитов)
+const unitTypes = [
+  { id: 'infantry', name: 'Пехотинец', icon: '👤', color: '#795548' },
+  { id: 'sailor', name: 'Матрос', icon: '⚓', color: '#0D47A1' },
+  { id: 'guerrilla', name: 'Партизан', icon: '🔫', color: '#006064' },
+  { id: 'cavalry', name: 'Кавалерист', icon: '🐎', color: '#FF9800' },
+  { id: 'cossack', name: 'Казак', icon: '🏇', color: '#BF360C' },
+  { id: 'machinegun', name: 'Пулемётчик', icon: '🔫', color: '#8D6E63' },
+  { id: 'tachankagun', name: 'Тачанка', icon: '🔫+🐎', color: '#FFA000' },
+  { id: 'sniper', name: 'Снайпер', icon: '⌖', color: '#263238' },
+  { id: 'cannon', name: 'Пушка', icon: '💣', color: '#5D4037' },
+  { id: 'howitzer', name: 'Гаубица', icon: '💥', color: '#3E2723' },
+  { id: 'armoredcar', name: 'Бронеавтомобиль', icon: '🚙', color: '#616161' },
+  { id: 'tank', name: 'Танк', icon: '🔘', color: '#212121' }
+];
+
 // Основной компонент редактора карт
 const HexMapEditor = () => {
   // Состояния для размеров карты
   const [mapRadius, setMapRadius] = useState(5);
   const [showSizeInput, setShowSizeInput] = useState(true);
   const [selectedTerrain, setSelectedTerrain] = useState(terrainTypes[0]);
-  const [hexMap, setHexMap] = useState<Array<{q: number; r: number; s: number; terrainType: string; color: string; height: number}>>([]);
+  const [hexMap, setHexMap] = useState<Array<{q: number; r: number; s: number; terrainType: string; color: string; height: number; unit?: {type: string; icon: string; color: string} }>>([]);
   const [show3DPreview, setShow3DPreview] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [orientation, setOrientation] = useState<'flat' | 'pointy'>('flat');
   const [hexCount, setHexCount] = useState(0);
+  const [editMode, setEditMode] = useState<'terrain' | 'units'>('terrain');
+  const [selectedUnit, setSelectedUnit] = useState<typeof unitTypes[0] | null>(null);
   
   // Состояния для управления видом 2D карты
   const [viewTransform, setViewTransform] = useState({ scale: 1, x: 0, y: 0 });
@@ -34,7 +52,7 @@ const HexMapEditor = () => {
   const svgElement = useRef<SVGSVGElement>(null);
   
   // Добавляем состояние для оптимизации рендеринга
-  const [visibleHexes, setVisibleHexes] = useState<Array<{q: number; r: number; s: number; terrainType: string; color: string; height: number}>>([]);
+  const [visibleHexes, setVisibleHexes] = useState<Array<{q: number; r: number; s: number; terrainType: string; color: string; height: number; unit?: {type: string; icon: string; color: string} }>>([]);
   
   // Инициализация карты с гексагональной сеткой в кубических координатах
   const initializeMap = useCallback(() => {
@@ -94,15 +112,32 @@ const HexMapEditor = () => {
   }, [orientation]);
   
   // Обработчик клика по хексу
-  const handleHexClick = (hex: {q: number; r: number; s: number; terrainType: string; color: string; height: number}) => {
+  const handleHexClick = (hex: {q: number; r: number; s: number; terrainType: string; color: string; height: number; unit?: {type: string; icon: string; color: string}}) => {
     const updatedMap = hexMap.map(h => {
       if (h.q === hex.q && h.r === hex.r && h.s === hex.s) {
-        return {
-          ...h,
-          terrainType: selectedTerrain.id,
-          color: selectedTerrain.color,
-          height: selectedTerrain.height
-        };
+        if (editMode === 'terrain') {
+          return {
+            ...h,
+            terrainType: selectedTerrain.id,
+            color: selectedTerrain.color,
+            height: selectedTerrain.height
+          };
+        } else if (editMode === 'units') {
+          if (selectedUnit) {
+            return {
+              ...h,
+              unit: {
+                type: selectedUnit.id,
+                icon: selectedUnit.icon,
+                color: selectedUnit.color
+              }
+            };
+          } else {
+            // Если выбрано "удалить юнит", то удаляем юнит с гекса
+            const { unit, ...restHex } = h;
+            return restHex;
+          }
+        }
       }
       return h;
     });
@@ -111,7 +146,7 @@ const HexMapEditor = () => {
   };
   
   // Обработчики для рисования с зажатой кнопкой мыши
-  const handleMouseDown = (hex: {q: number; r: number; s: number; terrainType: string; color: string; height: number}, e: React.MouseEvent) => {
+  const handleMouseDown = (hex: {q: number; r: number; s: number; terrainType: string; color: string; height: number; unit?: {type: string; icon: string; color: string}}, e: React.MouseEvent) => {
     // Проверяем, что это левая кнопка мыши (0)
     if (e.button === 0) {
       setIsDrawing(true);
@@ -124,7 +159,7 @@ const HexMapEditor = () => {
     setIsDrawing(false);
   };
   
-  const handleMouseEnter = (hex: {q: number; r: number; s: number; terrainType: string; color: string; height: number}) => {
+  const handleMouseEnter = (hex: {q: number; r: number; s: number; terrainType: string; color: string; height: number; unit?: {type: string; icon: string; color: string}}) => {
     if (isDrawing) {
       handleHexClick(hex);
     }
@@ -215,10 +250,22 @@ const HexMapEditor = () => {
   // Экспорт в JSON
   const exportToJSON = () => {
     // Создаем новый объект только с нужными полями
-    const cleanedMap = hexMap.map(hex => ({
-      position: { q: hex.q, r: hex.r, s: hex.s },
-      terrainType: hex.terrainType
-    }));
+    const cleanedMap = hexMap.map(hex => {
+      const basicHex = {
+        position: { q: hex.q, r: hex.r, s: hex.s },
+        terrainType: hex.terrainType
+      };
+      
+      // Добавляем юнит, если он существует
+      if (hex.unit) {
+        return {
+          ...basicHex,
+          unit: { type: hex.unit.type }
+        };
+      }
+      
+      return basicHex;
+    });
     
     // Форматируем JSON с отступами для лучшей читаемости
     const jsonData = JSON.stringify({ 
@@ -345,6 +392,21 @@ const HexMapEditor = () => {
           
           // Добавляем в сцену
           scene.add(hexMesh);
+          
+          // Добавляем юнит на карту, если он есть
+          if (hex.unit) {
+            // Создаем цилиндр для представления юнита
+            const unitGeometry = new THREE.CylinderGeometry(0.3, 0.3, 0.4, 16);
+            const unitMaterial = new THREE.MeshLambertMaterial({ color: hex.unit.color });
+            const unitMesh = new THREE.Mesh(unitGeometry, unitMaterial);
+            
+            // Позиционируем юнит над гексом
+            unitMesh.position.x = hexMesh.position.x;
+            unitMesh.position.z = hexMesh.position.z;
+            unitMesh.position.y = 0.3; // Поднимаем над поверхностью гекса
+            
+            scene.add(unitMesh);
+          }
         }
         
         hexIndex = endIndex;
@@ -460,7 +522,7 @@ const HexMapEditor = () => {
   }, [hexMap, viewTransform, getHexPosition]);
   
   // Отрисовываем хекс SVG с координатами
-  const renderHexSVG = (hex: {q: number; r: number; s: number; terrainType: string; color: string; height: number}) => {
+  const renderHexSVG = (hex: {q: number; r: number; s: number; terrainType: string; color: string; height: number; unit?: {type: string; icon: string; color: string}}) => {
     const { x, y } = getHexPosition(hex.q, hex.r);
     const size = 20;
     const points = [];
@@ -474,7 +536,7 @@ const HexMapEditor = () => {
       points.push(`${point_x},${point_y}`);
     }
     
-    // Создаем гекс без отображения координат
+    // Создаем гекс с юнитом, если он есть
     return (
       <g key={`${hex.q},${hex.r},${hex.s}`}>
         <polygon
@@ -485,6 +547,31 @@ const HexMapEditor = () => {
           onMouseDown={(e) => handleMouseDown(hex, e)}
           onMouseEnter={() => handleMouseEnter(hex)}
         />
+        {hex.unit && (
+          <g>
+            <circle 
+              cx={x} 
+              cy={y} 
+              r={size/2} 
+              fill={hex.unit.color} 
+              stroke="#000" 
+              strokeWidth="1"
+              style={{ userSelect: 'none' }}
+            />
+            <text 
+              x={x} 
+              y={y} 
+              textAnchor="middle" 
+              dominantBaseline="middle" 
+              fill="white"
+              fontSize={size/1.5}
+              fontWeight="bold"
+              style={{ userSelect: 'none', pointerEvents: 'none' }}
+            >
+              {hex.unit.icon}
+            </text>
+          </g>
+        )}
       </g>
     );
   };
@@ -541,7 +628,7 @@ const HexMapEditor = () => {
     }
     
     // Сохраняем текущую карту в виде объекта для быстрого доступа
-    const currentHexes: Record<string, {q: number; r: number; s: number; terrainType: string; color: string; height: number}> = {};
+    const currentHexes: Record<string, {q: number; r: number; s: number; terrainType: string; color: string; height: number; unit?: {type: string; icon: string; color: string} }> = {};
     hexMap.forEach(hex => {
       const key = `${hex.q},${hex.r},${hex.s}`;
       currentHexes[key] = hex;
@@ -610,9 +697,9 @@ const HexMapEditor = () => {
         }
 
         // Преобразуем загруженные данные в формат карты
-        const loadedMap = jsonData.hexes.map((hex: { position: { q: number; r: number; s: number }; terrainType: string }) => {
+        const loadedMap = jsonData.hexes.map((hex: { position: { q: number; r: number; s: number }; terrainType: string; unit?: { type: string } }) => {
           const terrainInfo = terrainTypes.find(t => t.id === hex.terrainType) || terrainTypes[0];
-          return {
+          const basicHex = {
             q: hex.position.q,
             r: hex.position.r,
             s: hex.position.s,
@@ -620,6 +707,21 @@ const HexMapEditor = () => {
             color: terrainInfo.color,
             height: terrainInfo.height
           };
+          
+          // Добавляем юнит, если он существует в JSON
+          if (hex.unit && hex.unit.type) {
+            const unitInfo = unitTypes.find(u => u.id === hex.unit?.type) || unitTypes[0];
+            return {
+              ...basicHex,
+              unit: {
+                type: unitInfo.id,
+                icon: unitInfo.icon,
+                color: unitInfo.color
+              }
+            };
+          }
+          
+          return basicHex;
         });
 
         // Обновляем состояние карты
@@ -686,7 +788,7 @@ const HexMapEditor = () => {
           <div className="mb-4 p-4 bg-white rounded-lg shadow-md">
             <div className="flex flex-col space-y-4">
               <div className="flex justify-between items-center">
-                <h2 className="text-lg font-semibold">Выберите тип местности</h2>
+                <h2 className="text-lg font-semibold">Режим редактирования</h2>
                 <div className="flex items-center space-x-2">
                   <label className="text-gray-700">Ориентация:</label>
                   <select
@@ -699,20 +801,74 @@ const HexMapEditor = () => {
                   </select>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {terrainTypes.map(terrain => (
-                  <button
-                    key={terrain.id}
-                    onClick={() => setSelectedTerrain(terrain)}
-                    className={`px-3 py-2 rounded-md text-white shadow ${
-                      selectedTerrain.id === terrain.id ? 'ring-2 ring-black' : ''
-                    }`}
-                    style={{ backgroundColor: terrain.color }}
-                  >
-                    {terrain.name}
-                  </button>
-                ))}
+              
+              <div className="flex space-x-2 mb-2">
+                <button
+                  onClick={() => setEditMode('terrain')}
+                  className={`px-3 py-2 rounded-md ${
+                    editMode === 'terrain' ? 'bg-blue-600 text-white' : 'bg-gray-200'
+                  }`}
+                >
+                  Редактор местности
+                </button>
+                <button
+                  onClick={() => setEditMode('units')}
+                  className={`px-3 py-2 rounded-md ${
+                    editMode === 'units' ? 'bg-blue-600 text-white' : 'bg-gray-200'
+                  }`}
+                >
+                  Расстановка шашек
+                </button>
               </div>
+              
+              {editMode === 'terrain' ? (
+                // Панель для выбора типа местности
+                <div className="flex flex-wrap gap-2">
+                  {terrainTypes.map(terrain => (
+                    <button
+                      key={terrain.id}
+                      onClick={() => setSelectedTerrain(terrain)}
+                      className={`px-3 py-2 rounded-md text-white shadow ${
+                        selectedTerrain.id === terrain.id ? 'ring-2 ring-black' : ''
+                      }`}
+                      style={{ backgroundColor: terrain.color }}
+                    >
+                      {terrain.name}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                // Панель для выбора типа шашек
+                <div>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    <button
+                      onClick={() => setSelectedUnit(null)}
+                      className={`px-3 py-2 rounded-md bg-red-500 text-white shadow ${
+                        selectedUnit === null ? 'ring-2 ring-black' : ''
+                      }`}
+                    >
+                      Удалить юнит
+                    </button>
+                    {unitTypes.map(unit => (
+                      <button
+                        key={unit.id}
+                        onClick={() => setSelectedUnit(unit)}
+                        className={`px-3 py-2 rounded-md text-white shadow ${
+                          selectedUnit?.id === unit.id ? 'ring-2 ring-black' : ''
+                        }`}
+                        style={{ backgroundColor: unit.color }}
+                      >
+                        {unit.icon} {unit.name}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-sm text-gray-600">
+                    Выберите тип юнита и кликните по гексу для его размещения. 
+                    Выберите "Удалить юнит" для удаления юнита с гекса.
+                  </p>
+                </div>
+              )}
+              
               <div className="flex justify-between items-center">
                 <div className="flex space-x-2">
                   <button
