@@ -5,11 +5,13 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 // Основные типы местности и их цвета
 const terrainTypes = [
   { id: 'field', name: 'Поле', color: '#4CAF50', height: 0 },
-  { id: 'swamp', name: 'Болото', color: '#1B5E20', height: -0.2 },
-  { id: 'hill', name: 'Возвышенность', color: '#F9A825', height: 0.5 },
-  { id: 'water', name: 'Вода', color: '#2196F3', height: -0.3 },
+  { id: 'hills', name: 'Холмы', color: '#F9A825', height: 0.5 },
   { id: 'forest', name: 'Лес', color: '#33691E', height: 0.2 },
-  { id: 'asphalt', name: 'Асфальт', color: '#424242', height: -0.1 }
+  { id: 'swamp', name: 'Болота', color: '#1B5E20', height: -0.2 },
+  { id: 'buildings', name: 'Здания', color: '#424242', height: 0.3 },
+  { id: 'water', name: 'Водоём', color: '#2196F3', height: -0.3 },
+  { id: 'mountains', name: 'Горы', color: '#795548', height: 0.8 },
+  { id: 'empty', name: 'Пустая клетка', color: 'transparent', height: 0, isEmpty: true }
 ];
 
 // Типы шашек (военных юнитов)
@@ -39,7 +41,8 @@ const HexMapEditor = () => {
   const [isDrawing, setIsDrawing] = useState(false);
   const [orientation, setOrientation] = useState<'flat' | 'pointy'>('flat');
   const [hexCount, setHexCount] = useState(0);
-  const [editMode, setEditMode] = useState<'terrain' | 'units'>('terrain');
+  const [editMode, setEditMode] = useState<'terrain' | 'units' | 'manage'>('terrain');
+  const [manageAction, setManageAction] = useState<'add' | 'delete'>('add');
   const [selectedUnit, setSelectedUnit] = useState<typeof unitTypes[0] | null>(null);
   
   // Состояния для управления видом 2D карты
@@ -53,6 +56,9 @@ const HexMapEditor = () => {
   
   // Добавляем состояние для оптимизации рендеринга
   const [visibleHexes, setVisibleHexes] = useState<Array<{q: number; r: number; s: number; terrainType: string; color: string; height: number; unit?: {type: string; icon: string; color: string} }>>([]);
+  
+  // Сохраняем удаленные гексы для возможности восстановления
+  const [deletedHexes, setDeletedHexes] = useState<Array<{q: number; r: number; s: number; terrainType: string; color: string; height: number; unit?: {type: string; icon: string; color: string} }>>([]);
   
   // Инициализация карты с гексагональной сеткой в кубических координатах
   const initializeMap = useCallback(() => {
@@ -77,13 +83,17 @@ const HexMapEditor = () => {
       
       for (let r = r1; r <= r2; r++) {
         const s = -q - r; // q + r + s = 0
+        
+        // Все гексы создаются с типом поля
+        const fieldTerrain = terrainTypes.find(t => t.id === 'field') || terrainTypes[0];
+        
         newMap.push({
           q,
           r,
           s,
-          terrainType: terrainTypes[0].id,
-          color: terrainTypes[0].color,
-          height: terrainTypes[0].height
+          terrainType: fieldTerrain.id,
+          color: fieldTerrain.color,
+          height: fieldTerrain.height
         });
       }
     }
@@ -111,18 +121,63 @@ const HexMapEditor = () => {
     }
   }, [orientation]);
   
+  // Функция для получения всех возможных координат гексов в пределах радиуса
+  const getAllPossibleHexCoordinates = useCallback(() => {
+    const coordinates: Array<{q: number; r: number; s: number}> = [];
+    for (let q = -mapRadius; q <= mapRadius; q++) {
+      const r1 = Math.max(-mapRadius, -q - mapRadius);
+      const r2 = Math.min(mapRadius, -q + mapRadius);
+      
+      for (let r = r1; r <= r2; r++) {
+        const s = -q - r; // q + r + s = 0
+        coordinates.push({ q, r, s });
+      }
+    }
+    return coordinates;
+  }, [mapRadius]);
+
+  // Функция для определения, существует ли гекс на карте
+  const doesHexExist = useCallback((q: number, r: number, s: number) => {
+    return hexMap.some(hex => hex.q === q && hex.r === r && hex.s === s && hex.terrainType !== 'empty');
+  }, [hexMap]);
+  
+  // Функция для получения гекса по координатам (или null, если его нет)
+  const getHexByCoords = useCallback((q: number, r: number, s: number) => {
+    return hexMap.find(hex => hex.q === q && hex.r === r && hex.s === s);
+  }, [hexMap]);
+  
   // Обработчик клика по хексу
   const handleHexClick = (hex: {q: number; r: number; s: number; terrainType: string; color: string; height: number; unit?: {type: string; icon: string; color: string}}) => {
-    const updatedMap = hexMap.map(h => {
-      if (h.q === hex.q && h.r === hex.r && h.s === hex.s) {
-        if (editMode === 'terrain') {
+    if (editMode === 'terrain') {
+      const updatedMap = hexMap.map(h => {
+        if (h.q === hex.q && h.r === hex.r && h.s === hex.s) {
           return {
             ...h,
             terrainType: selectedTerrain.id,
             color: selectedTerrain.color,
             height: selectedTerrain.height
           };
-        } else if (editMode === 'units') {
+        }
+        return h;
+      });
+      
+      // Обновляем счетчик видимых гексов
+      const wasEmpty = hex.terrainType === 'empty';
+      const becomesEmpty = selectedTerrain.id === 'empty';
+      
+      if (wasEmpty && !becomesEmpty) {
+        setHexCount(prev => prev + 1);
+      } else if (!wasEmpty && becomesEmpty) {
+        setHexCount(prev => prev - 1);
+      }
+      
+      setHexMap(updatedMap);
+    } else if (editMode === 'units') {
+      // Не добавляем юниты на пустые клетки
+      if (hex.terrainType === 'empty') return;
+
+      const updatedMap = hexMap.map(h => {
+        if (h.q === hex.q && h.r === hex.r && h.s === hex.s) {
           if (selectedUnit) {
             return {
               ...h,
@@ -138,12 +193,61 @@ const HexMapEditor = () => {
             return restHex;
           }
         }
+        return h;
+      });
+      setHexMap(updatedMap);
+    } else if (editMode === 'manage') {
+      if (manageAction === 'add' && hex.terrainType === 'empty') {
+        // Меняем тип гекса с "empty" на выбранный
+        const updatedMap = hexMap.map(h => {
+          if (h.q === hex.q && h.r === hex.r && h.s === hex.s) {
+            return {
+              ...h,
+              terrainType: selectedTerrain.id,
+              color: selectedTerrain.color,
+              height: selectedTerrain.height
+            };
+          }
+          return h;
+        });
+        setHexMap(updatedMap);
+        setHexCount(prev => prev + 1);
+      } else if (manageAction === 'delete' && hex.terrainType !== 'empty') {
+        // Меняем тип гекса на "empty" вместо удаления
+        const emptyTerrain = terrainTypes.find(t => t.id === 'empty') || terrainTypes[0];
+        
+        const updatedMap = hexMap.map(h => {
+          if (h.q === hex.q && h.r === hex.r && h.s === hex.s) {
+            // Сохраняем удаленный гекс для возможности восстановления
+            const savedHex = {...h};
+            setDeletedHexes(prev => [...prev, savedHex]);
+            
+            return {
+              ...h,
+              terrainType: emptyTerrain.id,
+              color: emptyTerrain.color,
+              height: emptyTerrain.height,
+              unit: undefined // Удаляем юнит, если он был
+            };
+          }
+          return h;
+        });
+        
+        setHexMap(updatedMap);
+        setHexCount(prev => prev - 1);
       }
-      return h;
-    });
-    setHexMap(updatedMap);
-    setHexCount(updatedMap.length);
+    }
   };
+  
+  // Обработчики для панорамирования карты
+  const handleSvgMouseDown = useCallback((e: React.MouseEvent) => {
+    // Только средняя кнопка мыши (1) или правая кнопка (2) для панорамирования
+    if (e.button === 1 || e.button === 2) {
+      setIsDragging(true);
+      setDragStart({ x: e.clientX, y: e.clientY });
+      e.preventDefault(); // Предотвращаем стандартное поведение браузера
+    }
+  }, []);
   
   // Обработчики для рисования с зажатой кнопкой мыши
   const handleMouseDown = (hex: {q: number; r: number; s: number; terrainType: string; color: string; height: number; unit?: {type: string; icon: string; color: string}}, e: React.MouseEvent) => {
@@ -165,16 +269,44 @@ const HexMapEditor = () => {
     }
   };
   
-  // Обработчики для панорамирования карты
-  const handleSvgMouseDown = useCallback((e: React.MouseEvent) => {
-    // Только средняя кнопка мыши (1) или правая кнопка (2) для панорамирования
-    if (e.button === 1 || e.button === 2) {
-      setIsDragging(true);
-      setDragStart({ x: e.clientX, y: e.clientY });
-      e.preventDefault(); // Предотвращаем стандартное поведение браузера
+  // Прямое преобразование экранных координат в кубические координаты гекса
+  const screenToHex = useCallback((x: number, y: number) => {
+    const size = 20; // размер гекса
+    
+    let q, r, s;
+    
+    if (orientation === 'flat') {
+      // Для flat-top
+      q = (2/3 * x) / size;
+      r = (-1/3 * x + Math.sqrt(3)/3 * y) / size;
+    } else {
+      // Для pointy-top
+      q = (Math.sqrt(3)/3 * x - 1/3 * y) / size;
+      r = (2/3 * y) / size;
     }
-  }, []);
-  
+    
+    s = -q - r; // Кубические координаты: q + r + s = 0
+    
+    // Округляем до ближайшего гекса
+    const qRound = Math.round(q);
+    const rRound = Math.round(r);
+    const sRound = Math.round(s);
+    
+    // Вычисляем разницу (ошибку округления)
+    const qDiff = Math.abs(qRound - q);
+    const rDiff = Math.abs(rRound - r);
+    const sDiff = Math.abs(sRound - s);
+    
+    // Корректируем координату с наибольшей ошибкой округления
+    if (qDiff > rDiff && qDiff > sDiff) {
+      return { q: -rRound - sRound, r: rRound, s: sRound };
+    } else if (rDiff > sDiff) {
+      return { q: qRound, r: -qRound - sRound, s: sRound };
+    } else {
+      return { q: qRound, r: rRound, s: -qRound - rRound };
+    }
+  }, [orientation]);
+
   const handleSvgMouseMove = useCallback((e: React.MouseEvent) => {
     if (isDragging) {
       const dx = e.clientX - dragStart.x;
@@ -267,9 +399,30 @@ const HexMapEditor = () => {
       return basicHex;
     });
     
+    // Для полноты карты добавляем информацию о пустых клетках
+    // Для создания полных границ карты
+    const fullCoordinates = [];
+    for (let q = -mapRadius; q <= mapRadius; q++) {
+      const r1 = Math.max(-mapRadius, -q - mapRadius);
+      const r2 = Math.min(mapRadius, -q + mapRadius);
+      
+      for (let r = r1; r <= r2; r++) {
+        const s = -q - r; // q + r + s = 0
+        fullCoordinates.push({ q, r, s });
+      }
+    }
+    
+    // Найти координаты, которых нет на текущей карте (пустые клетки)
+    const emptyCoordinates = fullCoordinates.filter(coord => 
+      !hexMap.some(hex => hex.q === coord.q && hex.r === coord.r && hex.s === coord.s)
+    ).map(coord => ({
+      position: { q: coord.q, r: coord.r, s: coord.s },
+      terrainType: 'empty'
+    }));
+    
     // Форматируем JSON с отступами для лучшей читаемости
     const jsonData = JSON.stringify({ 
-      hexes: cleanedMap, 
+      hexes: [...cleanedMap, ...emptyCoordinates], 
       mapRadius 
     }, null, 2);
     
@@ -536,6 +689,12 @@ const HexMapEditor = () => {
       points.push(`${point_x},${point_y}`);
     }
     
+    // Определяем курсор и обработчики в зависимости от режима
+    let cursorStyle = "pointer";
+    if (editMode === 'manage' && manageAction === 'delete') {
+      cursorStyle = "not-allowed";
+    }
+    
     // Создаем гекс с юнитом, если он есть
     return (
       <g key={`${hex.q},${hex.r},${hex.s}`}>
@@ -544,7 +703,15 @@ const HexMapEditor = () => {
           fill={hex.color}
           stroke="#333"
           strokeWidth="1"
-          onMouseDown={(e) => handleMouseDown(hex, e)}
+          style={{ cursor: cursorStyle }}
+          onMouseDown={(e) => {
+            if (editMode === 'manage' && manageAction === 'delete') {
+              handleHexClick(hex);
+              e.stopPropagation();
+            } else {
+              handleMouseDown(hex, e);
+            }
+          }}
           onMouseEnter={() => handleMouseEnter(hex)}
         />
         {hex.unit && (
@@ -636,7 +803,8 @@ const HexMapEditor = () => {
     
     // Используем setTimeout для предотвращения блокировки интерфейса
     setTimeout(() => {
-      const newMap = [];
+      const newMap: Array<{q: number; r: number; s: number; terrainType: string; color: string; height: number; unit?: {type: string; icon: string; color: string} }> = [];
+      const fieldTerrain = terrainTypes.find(t => t.id === 'field') || terrainTypes[0];
       
       // Создаем новую карту с новым радиусом
       for (let q = -newRadius; q <= newRadius; q++) {
@@ -651,24 +819,27 @@ const HexMapEditor = () => {
           if (currentHexes[key]) {
             newMap.push(currentHexes[key]);
           } else {
-            // Иначе создаем новый гекс с типом по умолчанию
+            // Для новых гексов всегда используем тип "поле"
             newMap.push({
               q,
               r,
               s,
-              terrainType: terrainTypes[0].id,
-              color: terrainTypes[0].color,
-              height: terrainTypes[0].height
+              terrainType: fieldTerrain.id,
+              color: fieldTerrain.color,
+              height: fieldTerrain.height
             });
           }
         }
       }
       
+      // Подсчитываем количество видимых (не пустых) гексов
+      const visibleHexCount = newMap.filter(hex => hex.terrainType !== 'empty').length;
+      
       setHexMap(newMap);
-      setHexCount(newMap.length);
+      setHexCount(visibleHexCount);
       setMapRadius(newRadius);
     }, 0);
-  }, [hexMap]);
+  }, [hexMap, terrainTypes]);
 
   const increaseRadius = useCallback(() => {
     // Ограничиваем максимальный радиус
@@ -696,39 +867,80 @@ const HexMapEditor = () => {
           throw new Error('Неверный формат файла');
         }
 
-        // Преобразуем загруженные данные в формат карты
-        const loadedMap = jsonData.hexes.map((hex: { position: { q: number; r: number; s: number }; terrainType: string; unit?: { type: string } }) => {
-          const terrainInfo = terrainTypes.find(t => t.id === hex.terrainType) || terrainTypes[0];
-          const basicHex = {
-            q: hex.position.q,
-            r: hex.position.r,
-            s: hex.position.s,
-            terrainType: terrainInfo.id,
-            color: terrainInfo.color,
-            height: terrainInfo.height
-          };
+        // Сначала создаем полную карту с полями
+        const fieldTerrain = terrainTypes.find(t => t.id === 'field') || terrainTypes[0];
+        const radius = jsonData.mapRadius;
+        const fullMap: Array<{q: number; r: number; s: number; terrainType: string; color: string; height: number; unit?: {type: string; icon: string; color: string} }> = [];
+        
+        // Создаем базовую карту с полями
+        for (let q = -radius; q <= radius; q++) {
+          const r1 = Math.max(-radius, -q - radius);
+          const r2 = Math.min(radius, -q + radius);
           
-          // Добавляем юнит, если он существует в JSON
-          if (hex.unit && hex.unit.type) {
-            const unitInfo = unitTypes.find(u => u.id === hex.unit?.type) || unitTypes[0];
-            return {
-              ...basicHex,
-              unit: {
+          for (let r = r1; r <= r2; r++) {
+            const s = -q - r; // q + r + s = 0
+            
+            fullMap.push({
+              q,
+              r,
+              s,
+              terrainType: fieldTerrain.id,
+              color: fieldTerrain.color,
+              height: fieldTerrain.height
+            });
+          }
+        }
+        
+        // Создаем индекс для быстрого доступа
+        const hexIndex: Record<string, number> = {};
+        fullMap.forEach((hex, index) => {
+          const key = `${hex.q},${hex.r},${hex.s}`;
+          hexIndex[key] = index;
+        });
+        
+        // Обновляем гексы на основе загруженных данных
+        jsonData.hexes.forEach((hex: { position: { q: number; r: number; s: number }; terrainType: string; unit?: { type: string } }) => {
+          // Пропускаем гексы, которые не должны быть на карте
+          if (hex.terrainType === 'empty') return;
+          
+          const key = `${hex.position.q},${hex.position.r},${hex.position.s}`;
+          const index = hexIndex[key];
+          
+          // Если гекс находится в пределах карты
+          if (index !== undefined) {
+            const terrainInfo = terrainTypes.find(t => t.id === hex.terrainType) || terrainTypes[0];
+            
+            // Обновляем гекс
+            fullMap[index] = {
+              ...fullMap[index],
+              terrainType: terrainInfo.id,
+              color: terrainInfo.color,
+              height: terrainInfo.height
+            };
+            
+            // Добавляем юнит, если он существует в JSON
+            if (hex.unit && hex.unit.type) {
+              const unitInfo = unitTypes.find(u => u.id === hex.unit?.type) || unitTypes[0];
+              fullMap[index].unit = {
                 type: unitInfo.id,
                 icon: unitInfo.icon,
                 color: unitInfo.color
-              }
-            };
+              };
+            }
           }
-          
-          return basicHex;
         });
-
+        
+        // Подсчитываем количество видимых гексов (не пустых)
+        const visibleHexCount = fullMap.filter(hex => hex.terrainType !== 'empty').length;
+        
         // Обновляем состояние карты
-        setMapRadius(jsonData.mapRadius);
-        setHexMap(loadedMap);
-        setHexCount(loadedMap.length);
+        setMapRadius(radius);
+        setHexMap(fullMap);
+        setHexCount(visibleHexCount);
         setShowSizeInput(false);
+        
+        // Сбрасываем вид
+        setViewTransform({ scale: 1, x: 0, y: 0 });
 
       } catch (error) {
         alert('Ошибка при загрузке файла: ' + (error as Error).message);
@@ -738,6 +950,76 @@ const HexMapEditor = () => {
     
     // Очищаем input для возможности повторной загрузки того же файла
     event.target.value = '';
+  };
+
+  // Функция для восстановления удаленных гексов
+  const restoreDeletedHexes = () => {
+    if (deletedHexes.length === 0) {
+      alert('Нет удаленных гексов для восстановления.');
+      return;
+    }
+    
+    // Восстанавливаем удаленные гексы
+    let updatedMap = [...hexMap];
+    let restoredCount = 0;
+    
+    deletedHexes.forEach(deletedHex => {
+      // Находим соответствующий гекс в текущей карте
+      const index = updatedMap.findIndex(h => 
+        h.q === deletedHex.q && h.r === deletedHex.r && h.s === deletedHex.s
+      );
+      
+      if (index !== -1 && updatedMap[index].terrainType === 'empty') {
+        // Восстанавливаем удаленный гекс
+        updatedMap[index] = {...deletedHex};
+        restoredCount++;
+      }
+    });
+    
+    if (restoredCount === 0) {
+      alert('Не удалось восстановить гексы. Возможно, они уже были изменены или выходят за границы текущей карты.');
+      return;
+    }
+    
+    setHexMap(updatedMap);
+    setHexCount(prev => prev + restoredCount);
+    setDeletedHexes([]);
+    
+    alert(`Восстановлено ${restoredCount} гексов.`);
+  };
+
+  // Отрисовываем контуры потенциальных гексов в режиме добавления
+  const renderPotentialHexes = () => {
+    if (editMode !== 'manage' || manageAction !== 'add') return null;
+    
+    // Отображаем только пустые гексы как потенциальные
+    const emptyHexes = hexMap.filter(hex => hex.terrainType === 'empty');
+    
+    return emptyHexes.map(hex => {
+      const { x, y } = getHexPosition(hex.q, hex.r);
+      const size = 20;
+      const points = [];
+      
+      for (let i = 0; i < 6; i++) {
+        const angle = (Math.PI / 3) * i + (orientation === 'pointy' ? Math.PI / 6 : 0);
+        const point_x = x + size * Math.cos(angle);
+        const point_y = y + size * Math.sin(angle);
+        points.push(`${point_x},${point_y}`);
+      }
+      
+      return (
+        <polygon
+          key={`potential-${hex.q},${hex.r},${hex.s}`}
+          points={points.join(' ')}
+          fill="rgba(200, 200, 200, 0.3)"
+          stroke="#999"
+          strokeWidth="1"
+          strokeDasharray="3,3"
+          style={{ cursor: "pointer" }}
+          onClick={() => handleHexClick(hex)}
+        />
+      );
+    });
   };
 
   return (
@@ -819,12 +1101,20 @@ const HexMapEditor = () => {
                 >
                   Расстановка шашек
                 </button>
+                <button
+                  onClick={() => setEditMode('manage')}
+                  className={`px-3 py-2 rounded-md ${
+                    editMode === 'manage' ? 'bg-blue-600 text-white' : 'bg-gray-200'
+                  }`}
+                >
+                  Управление гексами
+                </button>
               </div>
               
               {editMode === 'terrain' ? (
                 // Панель для выбора типа местности
                 <div className="flex flex-wrap gap-2">
-                  {terrainTypes.map(terrain => (
+                  {terrainTypes.filter(terrain => terrain.id !== 'empty').map(terrain => (
                     <button
                       key={terrain.id}
                       onClick={() => setSelectedTerrain(terrain)}
@@ -837,7 +1127,7 @@ const HexMapEditor = () => {
                     </button>
                   ))}
                 </div>
-              ) : (
+              ) : editMode === 'units' ? (
                 // Панель для выбора типа шашек
                 <div>
                   <div className="flex flex-wrap gap-2 mb-2">
@@ -866,6 +1156,54 @@ const HexMapEditor = () => {
                     Выберите тип юнита и кликните по гексу для его размещения. 
                     Выберите "Удалить юнит" для удаления юнита с гекса.
                   </p>
+                </div>
+              ) : (
+                // Панель для управления гексами (добавление/удаление)
+                <div>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    <button
+                      onClick={() => setManageAction('add')}
+                      className={`px-3 py-2 rounded-md bg-green-500 text-white shadow ${
+                        manageAction === 'add' ? 'ring-2 ring-black' : ''
+                      }`}
+                    >
+                      Добавить гексы
+                    </button>
+                    <button
+                      onClick={() => setManageAction('delete')}
+                      className={`px-3 py-2 rounded-md bg-red-500 text-white shadow ${
+                        manageAction === 'delete' ? 'ring-2 ring-black' : ''
+                      }`}
+                    >
+                      Удалить гексы
+                    </button>
+                  </div>
+                  {manageAction === 'add' && (
+                    <div>
+                      <p className="text-sm text-gray-600 mb-2">
+                        Кликните по полупрозрачным контурам, чтобы добавить гексы с выбранным типом местности:
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {terrainTypes.filter(terrain => terrain.id !== 'empty').map(terrain => (
+                          <button
+                            key={terrain.id}
+                            onClick={() => setSelectedTerrain(terrain)}
+                            className={`px-3 py-2 rounded-md text-white shadow ${
+                              selectedTerrain.id === terrain.id ? 'ring-2 ring-black' : ''
+                            }`}
+                            style={{ backgroundColor: terrain.color }}
+                          >
+                            {terrain.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {manageAction === 'delete' && (
+                    <p className="text-sm text-gray-600">
+                      Кликните по существующему гексу, чтобы удалить его с карты.
+                    </p>
+                  )}
                 </div>
               )}
               
@@ -919,7 +1257,7 @@ const HexMapEditor = () => {
               <div 
                 ref={svgContainer}
                 className="relative overflow-hidden" 
-                style={{ height: '70vh', cursor: isDragging ? 'grabbing' : 'grab' }}
+                style={{ height: '70vh', cursor: isDragging ? 'grabbing' : editMode === 'manage' ? (manageAction === 'add' ? 'crosshair' : 'not-allowed') : 'grab' }}
                 onMouseDown={handleSvgMouseDown}
                 onMouseMove={handleSvgMouseMove}
                 onMouseUp={handleSvgMouseUp}
@@ -938,13 +1276,18 @@ const HexMapEditor = () => {
                   }}
                 >
                   <g>
+                    {editMode === 'manage' && manageAction === 'add' && renderPotentialHexes()}
                     {visibleHexes.map(renderHexSVG)}
                   </g>
                 </svg>
                 <div className="absolute bottom-2 right-2 bg-white bg-opacity-75 p-2 rounded text-xs">
                   <p>Колесико мыши: масштаб</p>
                   <p>Правая кнопка мыши: перемещение</p>
-                  <p>Левая кнопка мыши: рисование</p>
+                  <p>Левая кнопка мыши: {
+                    editMode === 'manage' 
+                      ? (manageAction === 'add' ? 'добавление гексов' : 'удаление гексов') 
+                      : 'рисование'
+                  }</p>
                 </div>
               </div>
             </div>
@@ -980,6 +1323,14 @@ const HexMapEditor = () => {
               className="bg-blue-600 hover:bg-blue-800 text-white font-bold py-2 px-4 rounded"
             >
               Изменить размер карты
+            </button>
+            
+            <button
+              onClick={restoreDeletedHexes}
+              className="bg-teal-600 hover:bg-teal-800 text-white font-bold py-2 px-4 rounded"
+              title="Восстановить последние удаленные гексы"
+            >
+              Восстановить удаленные гексы
             </button>
             
             <button
