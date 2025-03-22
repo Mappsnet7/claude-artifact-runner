@@ -4,14 +4,109 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 // Основные типы местности и их цвета
 const terrainTypes = [
-  { id: 'field', name: 'Поле', color: '#4CAF50', height: 0 },
-  { id: 'hills', name: 'Холмы', color: '#F9A825', height: 0.5 },
-  { id: 'forest', name: 'Лес', color: '#33691E', height: 0.2 },
-  { id: 'swamp', name: 'Болота', color: '#1B5E20', height: -0.2 },
-  { id: 'buildings', name: 'Здания', color: '#424242', height: 0.3 },
-  { id: 'water', name: 'Водоём', color: '#2196F3', height: -0.3 },
-  { id: 'mountains', name: 'Горы', color: '#795548', height: 0.8 },
-  { id: 'empty', name: 'Пустая клетка', color: 'transparent', height: 0, isEmpty: true }
+  { 
+    id: 'field', 
+    name: 'Поле', 
+    color: '#4CAF50', 
+    height: 0,
+    pattern: (
+      <pattern id="fieldPattern" patternUnits="userSpaceOnUse" width="20" height="20">
+        <rect width="20" height="20" fill="#4CAF50" />
+        <path d="M0,10 L20,10 M10,0 L10,20" stroke="#3da142" strokeWidth="0.5" />
+        <circle cx="10" cy="10" r="1" fill="#8bc34a" />
+      </pattern>
+    )
+  },
+  { 
+    id: 'hills', 
+    name: 'Холмы', 
+    color: '#F9A825', 
+    height: 0.5,
+    pattern: (
+      <pattern id="hillsPattern" patternUnits="userSpaceOnUse" width="20" height="20">
+        <rect width="20" height="20" fill="#F9A825" />
+        <path d="M0,15 Q5,5 10,15 Q15,5 20,15" stroke="#e59a14" strokeWidth="1.5" fill="none" />
+      </pattern>
+    )
+  },
+  { 
+    id: 'forest', 
+    name: 'Лес', 
+    color: '#33691E', 
+    height: 0.2,
+    pattern: (
+      <pattern id="forestPattern" patternUnits="userSpaceOnUse" width="20" height="20">
+        <rect width="20" height="20" fill="#33691E" />
+        <path d="M5,15 L8,5 L11,15 Z" fill="#2c5518" />
+        <path d="M12,13 L15,5 L18,13 Z" fill="#2c5518" />
+      </pattern>
+    )
+  },
+  { 
+    id: 'swamp', 
+    name: 'Болота', 
+    color: '#1B5E20', 
+    height: -0.2,
+    pattern: (
+      <pattern id="swampPattern" patternUnits="userSpaceOnUse" width="20" height="20">
+        <rect width="20" height="20" fill="#1B5E20" />
+        <circle cx="5" cy="5" r="1.5" fill="#6c9e71" />
+        <circle cx="15" cy="5" r="1" fill="#6c9e71" />
+        <circle cx="10" cy="10" r="2" fill="#6c9e71" />
+        <circle cx="5" cy="15" r="1" fill="#6c9e71" />
+        <circle cx="15" cy="15" r="1.5" fill="#6c9e71" />
+      </pattern>
+    )
+  },
+  { 
+    id: 'buildings', 
+    name: 'Здания', 
+    color: '#424242', 
+    height: 0.3,
+    pattern: (
+      <pattern id="buildingsPattern" patternUnits="userSpaceOnUse" width="20" height="20">
+        <rect width="20" height="20" fill="#424242" />
+        <rect x="2" y="2" width="7" height="7" fill="#555555" />
+        <rect x="11" y="2" width="7" height="7" fill="#555555" />
+        <rect x="2" y="11" width="7" height="7" fill="#555555" />
+        <rect x="11" y="11" width="7" height="7" fill="#555555" />
+      </pattern>
+    )
+  },
+  { 
+    id: 'water', 
+    name: 'Водоём', 
+    color: '#2196F3', 
+    height: -0.3,
+    pattern: (
+      <pattern id="waterPattern" patternUnits="userSpaceOnUse" width="20" height="20">
+        <rect width="20" height="20" fill="#2196F3" />
+        <path d="M0,5 Q5,3 10,5 Q15,7 20,5" stroke="#1976D2" strokeWidth="1" fill="none" />
+        <path d="M0,10 Q5,8 10,10 Q15,12 20,10" stroke="#1976D2" strokeWidth="1" fill="none" />
+        <path d="M0,15 Q5,13 10,15 Q15,17 20,15" stroke="#1976D2" strokeWidth="1" fill="none" />
+      </pattern>
+    )
+  },
+  { 
+    id: 'mountains', 
+    name: 'Горы', 
+    color: '#795548', 
+    height: 0.8,
+    pattern: (
+      <pattern id="mountainsPattern" patternUnits="userSpaceOnUse" width="20" height="20">
+        <rect width="20" height="20" fill="#795548" />
+        <path d="M3,15 L10,5 L17,15 Z" fill="#5d4037" stroke="#4e342e" strokeWidth="0.5" />
+      </pattern>
+    )
+  },
+  { 
+    id: 'empty', 
+    name: 'Пустая клетка', 
+    color: 'transparent', 
+    height: 0, 
+    isEmpty: true,
+    pattern: null
+  }
 ];
 
 // Типы шашек (военных юнитов)
@@ -478,6 +573,145 @@ const HexMapEditor = () => {
       const ambientLight = new THREE.AmbientLight(0x404040);
       scene.add(ambientLight);
       
+      // Создаем текстуры для разных типов местности
+      const textures: Record<string, THREE.Texture> = {};
+      
+      // Функция для генерации канваса с текстурой
+      const createTextureCanvas = (terrainType: string): HTMLCanvasElement => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 128;
+        canvas.height = 128;
+        const ctx = canvas.getContext('2d');
+        
+        if (!ctx) return canvas;
+        
+        const terrain = terrainTypes.find(t => t.id === terrainType);
+        if (!terrain) return canvas;
+        
+        // Заполняем фон основным цветом
+        ctx.fillStyle = terrain.color;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Добавляем детали в зависимости от типа местности
+        switch (terrainType) {
+          case 'field':
+            // Рисуем траву и небольшие детали
+            ctx.strokeStyle = '#3da142';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            for (let i = 0; i < 10; i++) {
+              const x = Math.random() * canvas.width;
+              const y = Math.random() * canvas.height;
+              ctx.moveTo(x, y);
+              ctx.lineTo(x + 5, y - 10);
+            }
+            ctx.stroke();
+            break;
+            
+          case 'hills':
+            // Рисуем контуры холмов
+            ctx.strokeStyle = '#e59a14';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(0, 100);
+            ctx.quadraticCurveTo(30, 50, 60, 100);
+            ctx.quadraticCurveTo(90, 50, 128, 100);
+            ctx.stroke();
+            break;
+            
+          case 'forest':
+            // Рисуем деревья
+            ctx.fillStyle = '#2c5518';
+            for (let i = 0; i < 5; i++) {
+              const x = 20 + i * 20;
+              const y = 80;
+              // Ствол
+              ctx.fillRect(x - 2, y, 4, 20);
+              // Крона
+              ctx.beginPath();
+              ctx.moveTo(x - 15, y);
+              ctx.lineTo(x, y - 30);
+              ctx.lineTo(x + 15, y);
+              ctx.fill();
+            }
+            break;
+            
+          case 'swamp':
+            // Рисуем детали болот
+            ctx.fillStyle = '#6c9e71';
+            for (let i = 0; i < 20; i++) {
+              const x = Math.random() * canvas.width;
+              const y = Math.random() * canvas.height;
+              const radius = 2 + Math.random() * 5;
+              ctx.beginPath();
+              ctx.arc(x, y, radius, 0, Math.PI * 2);
+              ctx.fill();
+            }
+            break;
+            
+          case 'buildings':
+            // Рисуем здания
+            ctx.fillStyle = '#555555';
+            for (let i = 0; i < 3; i++) {
+              for (let j = 0; j < 3; j++) {
+                const x = 10 + i * 40;
+                const y = 10 + j * 40;
+                ctx.fillRect(x, y, 30, 30);
+              }
+            }
+            break;
+            
+          case 'water':
+            // Рисуем волны
+            ctx.strokeStyle = '#1976D2';
+            ctx.lineWidth = 2;
+            for (let i = 0; i < 5; i++) {
+              const y = 20 + i * 20;
+              ctx.beginPath();
+              ctx.moveTo(0, y);
+              ctx.bezierCurveTo(30, y - 10, 60, y + 10, 128, y - 5);
+              ctx.stroke();
+            }
+            break;
+            
+          case 'mountains':
+            // Рисуем горы
+            ctx.fillStyle = '#5d4037';
+            ctx.beginPath();
+            ctx.moveTo(0, 128);
+            ctx.lineTo(40, 30);
+            ctx.lineTo(70, 90);
+            ctx.lineTo(100, 20);
+            ctx.lineTo(128, 128);
+            ctx.fill();
+            // Добавляем снег на вершинах
+            ctx.fillStyle = '#e0e0e0';
+            ctx.beginPath();
+            ctx.moveTo(35, 40);
+            ctx.lineTo(40, 30);
+            ctx.lineTo(45, 40);
+            ctx.moveTo(95, 30);
+            ctx.lineTo(100, 20);
+            ctx.lineTo(105, 30);
+            ctx.fill();
+            break;
+            
+          default:
+            break;
+        }
+        
+        return canvas;
+      };
+      
+      // Создаем текстуры для каждого типа местности
+      terrainTypes.forEach(terrain => {
+        if (terrain.id !== 'empty') {
+          const canvas = createTextureCanvas(terrain.id);
+          const texture = new THREE.CanvasTexture(canvas);
+          textures[terrain.id] = texture;
+        }
+      });
+      
       // Ограничиваем количество хексов для 3D предпросмотра
       const maxHexesFor3D = 500;
       const hexesToRender = hexMap.length > maxHexesFor3D 
@@ -494,6 +728,12 @@ const HexMapEditor = () => {
         
         for (let i = hexIndex; i < endIndex; i++) {
           const hex = hexesToRender[i];
+          
+          // Пропускаем пустые клетки
+          if (hex.terrainType === 'empty') {
+            continue;
+          }
+          
           // Создаем геометрию хекса
           const hexShape = new THREE.Shape();
           const radius = 1.0;
@@ -521,8 +761,14 @@ const HexMapEditor = () => {
           // Поворачиваем геометрию, чтобы она была горизонтальной
           hexGeometry.rotateX(-Math.PI / 2);
           
-          // Создаем материал с цветом
-          const hexMaterial = new THREE.MeshLambertMaterial({ color: hex.color });
+          // Создаем материал с текстурой, если она доступна
+          const texture = textures[hex.terrainType];
+          const hexMaterial = texture 
+            ? new THREE.MeshLambertMaterial({ 
+                map: texture, 
+                color: 0xffffff  // Белый цвет для неискаженного отображения текстуры
+              })
+            : new THREE.MeshLambertMaterial({ color: hex.color });
           
           // Создаем меш
           const hexMesh = new THREE.Mesh(hexGeometry, hexMaterial);
@@ -695,12 +941,16 @@ const HexMapEditor = () => {
       cursorStyle = "not-allowed";
     }
     
+    // Находим информацию о текущем типе местности
+    const terrainInfo = terrainTypes.find(t => t.id === hex.terrainType);
+    const fillValue = terrainInfo && terrainInfo.pattern ? `url(#${hex.terrainType}Pattern)` : hex.color;
+    
     // Создаем гекс с юнитом, если он есть
     return (
       <g key={`${hex.q},${hex.r},${hex.s}`}>
         <polygon
           points={points.join(' ')}
-          fill={hex.color}
+          fill={fillValue}
           stroke="#333"
           strokeWidth="1"
           style={{ cursor: cursorStyle }}
@@ -1007,17 +1257,30 @@ const HexMapEditor = () => {
         points.push(`${point_x},${point_y}`);
       }
       
+      // Используем шаблонное заполнение для потенциальных гексов
       return (
-        <polygon
-          key={`potential-${hex.q},${hex.r},${hex.s}`}
-          points={points.join(' ')}
-          fill="rgba(200, 200, 200, 0.3)"
-          stroke="#999"
-          strokeWidth="1"
-          strokeDasharray="3,3"
-          style={{ cursor: "pointer" }}
-          onClick={() => handleHexClick(hex)}
-        />
+        <g key={`potential-${hex.q},${hex.r},${hex.s}`}>
+          <defs>
+            <pattern 
+              id={`potentialHexPattern-${hex.q}-${hex.r}-${hex.s}`} 
+              patternUnits="userSpaceOnUse" 
+              width="10" 
+              height="10"
+            >
+              <rect width="10" height="10" fill="#f0f0f0" />
+              <path d="M-1,1 l2,-2 M0,10 l10,-10 M9,11 l2,-2" stroke="#888" strokeWidth="1" />
+            </pattern>
+          </defs>
+          <polygon
+            points={points.join(' ')}
+            fill={`url(#potentialHexPattern-${hex.q}-${hex.r}-${hex.s})`}
+            stroke="#999"
+            strokeWidth="1"
+            strokeDasharray="3,3"
+            style={{ cursor: "pointer" }}
+            onClick={() => handleHexClick(hex)}
+          />
+        </g>
       );
     });
   };
@@ -1275,6 +1538,9 @@ const HexMapEditor = () => {
                     transformOrigin: '0 0'
                   }}
                 >
+                  <defs>
+                    {terrainTypes.filter(terrain => terrain.pattern).map(terrain => terrain.pattern)}
+                  </defs>
                   <g>
                     {editMode === 'manage' && manageAction === 'add' && renderPotentialHexes()}
                     {visibleHexes.map(renderHexSVG)}
