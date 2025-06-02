@@ -70,7 +70,6 @@ export class TerrainGenerator {
     const swampProb = params.swampDensity || 0.1; // 10% - болота
     const buildingsProb = params.buildingsDensity || 0.05; // 5% - здания
     const waterProb = params.waterLevel || 0.15; // 15% - вода
-    const mountainsProb = params.mountainsLevel || 0.05; // 5% - горы
     
     // Создаем карту с радиусом radius
     for (let q = -radius; q <= radius; q++) {
@@ -131,7 +130,6 @@ export class TerrainGenerator {
     const noiseScale = 0.1; // Масштаб шума (меньшие значения - более плавный ландшафт)
     const waterLevel = params.waterLevel || 0.3;
     const mountainsLevel = params.mountainsLevel || 0.7;
-    const forestThreshold = params.forestDensity || 0.45;
     const hillsThreshold = params.hillsDensity || 0.55;
     
     // Функция для получения шума в диапазоне [0, 1]
@@ -200,7 +198,7 @@ export class TerrainGenerator {
     }
     
     // Проводим пост-обработку карты для более органичных переходов
-    return this.postProcessTerrain(newMap, radius);
+    return this.postProcessTerrain(newMap);
   }
 
   // Метод 3: Островная генерация с использованием расстояния от центра
@@ -274,7 +272,7 @@ export class TerrainGenerator {
       }
     }
     
-    return this.postProcessTerrain(newMap, radius);
+    return this.postProcessTerrain(newMap);
   }
 
   // Метод 4: Генерация с био-регионами
@@ -354,11 +352,11 @@ export class TerrainGenerator {
       }
     }
     
-    return this.postProcessTerrain(newMap, radius);
+    return this.postProcessTerrain(newMap);
   }
 
   // Пост-обработка для сглаживания переходов между разными типами местности
-  private postProcessTerrain(map: HexData[], radius: number): HexData[] {
+  private postProcessTerrain(map: HexData[]): HexData[] {
     const processedMap = [...map];
     const hexMap: Record<string, HexData> = {};
     

@@ -3,18 +3,10 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import TerrainGeneratorPanel from './TerrainGeneratorPanel';
 import { 
-  FaDice, FaCog, FaMapMarkedAlt, FaChevronDown, FaChevronRight, 
-  FaPlay, FaInfoCircle, FaSave, FaRedo, FaUndo, FaEraser, 
-  FaTimes, FaUpload, FaDownload, FaSyncAlt, FaCube, FaPlus, 
-  FaMinus, FaRuler, FaChessKnight, FaTrash, FaEdit, FaCrosshairs,
-  FaFile, FaEye
+  FaSave, FaUndo, FaTimes, FaUpload, FaCube,
+  FaRuler, FaEdit, FaFile, FaEye
 } from 'react-icons/fa';
-import { 
-  GiMountains, GiIsland, GiForest, GiSwamp, GiWaterDrop, 
-  GiHouse, GiHillFort
-} from 'react-icons/gi';
-import { RiMapFill, RiEarthLine, RiFileUploadLine } from 'react-icons/ri';
-import { BsPuzzle, BsGrid3X3Gap } from 'react-icons/bs';
+import { RiMapFill, RiEarthLine } from 'react-icons/ri';
 
 // Основные типы местности и их цвета
 const terrainTypes = [
@@ -154,11 +146,15 @@ const HexMapEditor = () => {
   const [manageAction, setManageAction] = useState<'add' | 'delete'>('add');
   const [selectedUnit, setSelectedUnit] = useState<typeof unitTypes[0] | null>(null);
   const [showTerrainGenerator, setShowTerrainGenerator] = useState(false);
+  const [showUnits, setShowUnits] = useState(true); // Состояние для отображения/скрытия юнитов
   
   // Состояния для управления видом 2D карты
   const [viewTransform, setViewTransform] = useState({ scale: 1, x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
+  
+  // Добавляем константу для масштаба юнитов (более реалистичный размер)
+  const UNIT_SCALE = 2.0; // Масштаб юнитов относительно гекса
   
   const threeContainer = useRef<HTMLDivElement>(null);
   const svgContainer = useRef<HTMLDivElement>(null);
@@ -170,7 +166,7 @@ const HexMapEditor = () => {
   // Сохраняем удаленные гексы для возможности восстановления
   const [deletedHexes, setDeletedHexes] = useState<Array<{q: number; r: number; s: number; terrainType: string; color: string; height: number; unit?: {type: string; icon: string; color: string} }>>([]);
   
-  // Инициализация карты с гексагональной сеткой в кубических координатах
+  // Инициализация карты с гексагональной сеткой в кубических координатах 
   const initializeMap = useCallback(() => {
     // Если карта уже существует и не пустая, используем resizeMap для сохранения существующих клеток
     if (hexMap.length > 0) {
@@ -232,29 +228,13 @@ const HexMapEditor = () => {
   }, [orientation]);
   
   // Функция для получения всех возможных координат гексов в пределах радиуса
-  const getAllPossibleHexCoordinates = useCallback(() => {
-    const coordinates: Array<{q: number; r: number; s: number}> = [];
-    for (let q = -mapRadius; q <= mapRadius; q++) {
-      const r1 = Math.max(-mapRadius, -q - mapRadius);
-      const r2 = Math.min(mapRadius, -q + mapRadius);
-      
-      for (let r = r1; r <= r2; r++) {
-        const s = -q - r; // q + r + s = 0
-        coordinates.push({ q, r, s });
-      }
-    }
-    return coordinates;
-  }, [mapRadius]);
-
+  // Эта функция не используется и была удалена
+  
   // Функция для определения, существует ли гекс на карте
-  const doesHexExist = useCallback((q: number, r: number, s: number) => {
-    return hexMap.some(hex => hex.q === q && hex.r === r && hex.s === s && hex.terrainType !== 'empty');
-  }, [hexMap]);
+  // Эта функция не используется и была удалена
   
   // Функция для получения гекса по координатам (или null, если его нет)
-  const getHexByCoords = useCallback((q: number, r: number, s: number) => {
-    return hexMap.find(hex => hex.q === q && hex.r === r && hex.s === s);
-  }, [hexMap]);
+  // Эта функция не используется и была удалена
   
   // Обработчик клика по хексу
   const handleHexClick = (hex: {q: number; r: number; s: number; terrainType: string; color: string; height: number; unit?: {type: string; icon: string; color: string}}) => {
@@ -379,61 +359,6 @@ const HexMapEditor = () => {
     }
   };
   
-  // Прямое преобразование экранных координат в кубические координаты гекса
-  const screenToHex = useCallback((x: number, y: number) => {
-    const size = 20; // размер гекса
-    
-    let q, r, s;
-    
-    if (orientation === 'flat') {
-      // Для flat-top
-      q = (2/3 * x) / size;
-      r = (-1/3 * x + Math.sqrt(3)/3 * y) / size;
-    } else {
-      // Для pointy-top
-      q = (Math.sqrt(3)/3 * x - 1/3 * y) / size;
-      r = (2/3 * y) / size;
-    }
-    
-    s = -q - r; // Кубические координаты: q + r + s = 0
-    
-    // Округляем до ближайшего гекса
-    const qRound = Math.round(q);
-    const rRound = Math.round(r);
-    const sRound = Math.round(s);
-    
-    // Вычисляем разницу (ошибку округления)
-    const qDiff = Math.abs(qRound - q);
-    const rDiff = Math.abs(rRound - r);
-    const sDiff = Math.abs(sRound - s);
-    
-    // Корректируем координату с наибольшей ошибкой округления
-    if (qDiff > rDiff && qDiff > sDiff) {
-      return { q: -rRound - sRound, r: rRound, s: sRound };
-    } else if (rDiff > sDiff) {
-      return { q: qRound, r: -qRound - sRound, s: sRound };
-    } else {
-      return { q: qRound, r: rRound, s: -qRound - rRound };
-    }
-  }, [orientation]);
-
-  const handleSvgMouseMove = useCallback((e: React.MouseEvent) => {
-    if (isDragging) {
-      const dx = e.clientX - dragStart.x;
-      const dy = e.clientY - dragStart.y;
-      setViewTransform(prev => ({
-        ...prev,
-        x: prev.x + dx,
-        y: prev.y + dy
-      }));
-      setDragStart({ x: e.clientX, y: e.clientY });
-    }
-  }, [isDragging, dragStart]);
-  
-  const handleSvgMouseUp = useCallback(() => {
-    setIsDragging(false);
-  }, []);
-  
   // Обработчик колесика мыши для масштабирования
   const handleWheel = useCallback((e: React.WheelEvent) => {
     e.preventDefault();
@@ -552,20 +477,25 @@ const HexMapEditor = () => {
       
       // Создаем сцену
       scene = new THREE.Scene();
-      scene.background = new THREE.Color(0xf0f0f0);
+      scene.background = new THREE.Color(0x87CEEB); // Более красивый цвет фона (голубое небо)
       
       // Настраиваем камеру
       const width = threeContainer.current.clientWidth;
       const height = 400;
-      camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+      camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
       camera.position.z = 15;
-      camera.position.y = 10;
-      camera.position.x = 0;
+      camera.position.y = 12;
+      camera.position.x = 5;
       camera.lookAt(0, 0, 0);
       
-      // Создаем рендерер
+      // Создаем рендерер с включенными тенями
       renderer = new THREE.WebGLRenderer({ antialias: true });
       renderer.setSize(width, height);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Мягкие тени
+      renderer.outputColorSpace = THREE.SRGBColorSpace; // Улучшенная цветопередача
+      renderer.toneMapping = THREE.ACESFilmicToneMapping; // Кинематографический тональный маппинг
+      renderer.toneMappingExposure = 1.2; // Немного увеличиваем экспозицию для более яркой картинки
       
       // Очищаем контейнер и добавляем канвас
       while (threeContainer.current.firstChild) {
@@ -576,17 +506,46 @@ const HexMapEditor = () => {
       // Добавляем контроллер орбиты для управления камерой
       controls = new OrbitControls(camera, renderer.domElement);
       controls.enableDamping = true;
-      controls.dampingFactor = 0.25;
+      controls.dampingFactor = 0.15;
       controls.screenSpacePanning = false;
       controls.maxPolarAngle = Math.PI / 2;
+      controls.minDistance = 5;
+      controls.maxDistance = 50;
       
-      // Добавляем освещение
-      const light = new THREE.DirectionalLight(0xffffff, 1);
-      light.position.set(1, 1, 1).normalize();
-      scene.add(light);
+      // Улучшенное освещение
+      // Основное направленное освещение (солнце)
+      const sunLight = new THREE.DirectionalLight(0xffffcc, 1);
+      sunLight.position.set(5, 10, 7);
+      sunLight.castShadow = true;
       
-      const ambientLight = new THREE.AmbientLight(0x404040);
+      // Настройка теней
+      sunLight.shadow.mapSize.width = 2048;
+      sunLight.shadow.mapSize.height = 2048;
+      sunLight.shadow.camera.near = 0.5;
+      sunLight.shadow.camera.far = 50;
+      sunLight.shadow.bias = -0.001;
+      
+      // Установка размеров области видимости теней
+      const d = 20;
+      sunLight.shadow.camera.left = -d;
+      sunLight.shadow.camera.right = d;
+      sunLight.shadow.camera.top = d;
+      sunLight.shadow.camera.bottom = -d;
+      
+      scene.add(sunLight);
+      
+      // Добавляем дополнительное направленное освещение для подсветки теней
+      const fillLight = new THREE.DirectionalLight(0xaaccff, 0.5);
+      fillLight.position.set(-5, 8, -5);
+      scene.add(fillLight);
+      
+      // Улучшенное окружающее освещение
+      const ambientLight = new THREE.AmbientLight(0x555555);
       scene.add(ambientLight);
+      
+      // Добавляем полусферическое освещение для большей реалистичности
+      const hemiLight = new THREE.HemisphereLight(0xffffbb, 0x080820, 0.5);
+      scene.add(hemiLight);
       
       // Создаем текстуры для разных типов местности
       const textures: Record<string, THREE.Texture> = {};
@@ -787,6 +746,8 @@ const HexMapEditor = () => {
           
           // Создаем меш
           const hexMesh = new THREE.Mesh(hexGeometry, hexMaterial);
+          hexMesh.castShadow = true;
+          hexMesh.receiveShadow = true;
           
           // Позиционируем хексы в 3D-просмотре с использованием кубических координат
           if (orientation === 'flat') {
@@ -807,18 +768,45 @@ const HexMapEditor = () => {
           // Добавляем в сцену
           scene.add(hexMesh);
           
-          // Добавляем юнит на карту, если он есть
-          if (hex.unit) {
+          // Добавляем юнит на карту, если он есть и юниты не скрыты
+          if (hex.unit && showUnits) {
             // Создаем цилиндр для представления юнита
-            const unitGeometry = new THREE.CylinderGeometry(0.3, 0.3, 0.4, 16);
-            const unitMaterial = new THREE.MeshLambertMaterial({ color: hex.unit.color });
-            const unitMesh = new THREE.Mesh(unitGeometry, unitMaterial);
+            const unitGeometry = new THREE.CylinderGeometry(0.3 * UNIT_SCALE, 0.3 * UNIT_SCALE, 0.4, 16);
+            const unitMaterial = new THREE.MeshLambertMaterial({ 
+              color: hex.unit.color,
+              emissive: new THREE.Color(hex.unit.color).multiplyScalar(0.2) // Добавляем слабое свечение
+            });
             
-            // Позиционируем юнит над гексом
+            const unitMesh = new THREE.Mesh(unitGeometry, unitMaterial);
+            unitMesh.castShadow = true;
+            unitMesh.receiveShadow = true;
+            
+            // Позиционируем юнит над гексом, учитывая высоту ландшафта
             unitMesh.position.x = hexMesh.position.x;
             unitMesh.position.z = hexMesh.position.z;
-            unitMesh.position.y = 0.3; // Поднимаем над поверхностью гекса
             
+            // Размещаем юнит над поверхностью гекса, с учетом высоты ландшафта
+            // Вычисляем высоту с учетом того, что высота хранится как коэффициент,
+            // а depth из extrudeSettings - это фактическая высота в 3D
+            const terrainHeight = hex.height > 0 ? hex.height : 0.1;
+            unitMesh.position.y = terrainHeight + 0.2; // Устанавливаем юнит чуть выше поверхности
+            
+            // Добавляем круглую платформу под юнитом для визуального улучшения
+            const platformGeometry = new THREE.CylinderGeometry(0.35 * UNIT_SCALE, 0.35 * UNIT_SCALE, 0.05, 16);
+            const platformMaterial = new THREE.MeshLambertMaterial({ 
+              color: 0x333333,
+              emissive: 0x111111
+            });
+            const platformMesh = new THREE.Mesh(platformGeometry, platformMaterial);
+            platformMesh.position.set(
+              unitMesh.position.x,
+              unitMesh.position.y - 0.2, // Размещаем платформу под юнитом
+              unitMesh.position.z
+            );
+            platformMesh.castShadow = true;
+            platformMesh.receiveShadow = true;
+            
+            scene.add(platformMesh);
             scene.add(unitMesh);
           }
         }
@@ -836,7 +824,27 @@ const HexMapEditor = () => {
       
       // Добавляем сетку для ориентации
       const gridHelper = new THREE.GridHelper(mapRadius * 4, mapRadius * 2);
+      gridHelper.position.y = -0.05; // Размещаем сетку чуть ниже уровня местности
+      gridHelper.material.opacity = 0.2;
+      gridHelper.material.transparent = true;
       scene.add(gridHelper);
+      
+      // Добавляем небольшую декоративную плоскость под картой
+      const planeGeometry = new THREE.PlaneGeometry(mapRadius * 6, mapRadius * 6);
+      const planeMaterial = new THREE.MeshStandardMaterial({ 
+        color: 0x336699, 
+        metalness: 0.1,
+        roughness: 0.8,
+        side: THREE.DoubleSide
+      });
+      const plane = new THREE.Mesh(planeGeometry, planeMaterial);
+      plane.rotation.x = -Math.PI / 2; // Размещаем горизонтально
+      plane.position.y = -0.1; // Немного ниже основной сетки
+      plane.receiveShadow = true;
+      scene.add(plane);
+      
+      // Добавляем туман для создания атмосферы
+      scene.fog = new THREE.FogExp2(0x87CEEB, 0.01);
       
       // Анимация
       let animationFrameId: number;
@@ -879,7 +887,7 @@ const HexMapEditor = () => {
         }
       };
     }
-  }, [show3DPreview, hexMap, mapRadius, orientation]);
+  }, [show3DPreview, hexMap, mapRadius, orientation, showUnits]);
   
   // Обновляем видимые гексы при изменении масштаба или позиции просмотра
   useEffect(() => {
@@ -960,50 +968,59 @@ const HexMapEditor = () => {
     const terrainInfo = terrainTypes.find(t => t.id === hex.terrainType);
     const fillValue = terrainInfo && terrainInfo.pattern ? `url(#${hex.terrainType}Pattern)` : hex.color;
     
-    // Создаем гекс с юнитом, если он есть
+    // Создаем гекс без юнита, юниты будут отрисованы отдельно позже
     return (
-      <g key={`${hex.q},${hex.r},${hex.s}`}>
-        <polygon
-          points={points.join(' ')}
-          fill={fillValue}
-          stroke="#333"
+      <polygon
+        key={`hex-${hex.q},${hex.r},${hex.s}`}
+        points={points.join(' ')}
+        fill={fillValue}
+        stroke="#333"
+        strokeWidth="1"
+        style={{ cursor: cursorStyle }}
+        onMouseDown={(e) => {
+          if (editMode === 'manage' && manageAction === 'delete') {
+            handleHexClick(hex);
+            e.stopPropagation();
+          } else {
+            handleMouseDown(hex, e);
+          }
+        }}
+        onMouseEnter={() => handleMouseEnter(hex)}
+      />
+    );
+  };
+
+  // Отдельная функция для отрисовки юнитов
+  const renderUnitSVG = (hex: {q: number; r: number; s: number; terrainType: string; color: string; height: number; unit?: {type: string; icon: string; color: string}}) => {
+    if (!hex.unit || !showUnits) return null;
+    
+    const { x, y } = getHexPosition(hex.q, hex.r);
+    const size = 20;
+    
+    return (
+      <g key={`unit-${hex.q},${hex.r},${hex.s}`}>
+        <circle 
+          cx={x} 
+          cy={y} 
+          r={size * UNIT_SCALE / 2} 
+          fill={hex.unit.color} 
+          stroke="#000" 
           strokeWidth="1"
-          style={{ cursor: cursorStyle }}
-          onMouseDown={(e) => {
-            if (editMode === 'manage' && manageAction === 'delete') {
-              handleHexClick(hex);
-              e.stopPropagation();
-            } else {
-              handleMouseDown(hex, e);
-            }
-          }}
-          onMouseEnter={() => handleMouseEnter(hex)}
+          style={{ cursor: editMode === 'units' && selectedUnit === null ? 'not-allowed' : 'pointer', userSelect: 'none', pointerEvents: 'all' }}
+          onClick={(e) => handleUnitClick(hex, e)}
         />
-        {hex.unit && (
-          <g>
-            <circle 
-              cx={x} 
-              cy={y} 
-              r={size/2} 
-              fill={hex.unit.color} 
-              stroke="#000" 
-              strokeWidth="1"
-              style={{ userSelect: 'none' }}
-            />
-            <text 
-              x={x} 
-              y={y} 
-              textAnchor="middle" 
-              dominantBaseline="middle" 
-              fill="white"
-              fontSize={size/1.5}
-              fontWeight="bold"
-              style={{ userSelect: 'none', pointerEvents: 'none' }}
-            >
-              {hex.unit.icon}
-            </text>
-          </g>
-        )}
+        <text 
+          x={x} 
+          y={y} 
+          textAnchor="middle" 
+          dominantBaseline="middle" 
+          fill="white"
+          fontSize={size * UNIT_SCALE / 2}
+          fontWeight="bold"
+          style={{ userSelect: 'none', pointerEvents: 'none' }}
+        >
+          {hex.unit.icon}
+        </text>
       </g>
     );
   };
@@ -1313,6 +1330,41 @@ const HexMapEditor = () => {
     setViewTransform({ scale: 1, x: 0, y: 0 });
   };
 
+  // Обработчик клика по юниту
+  const handleUnitClick = (hex: {q: number; r: number; s: number; terrainType: string; color: string; height: number; unit?: {type: string; icon: string; color: string}}, e: React.MouseEvent) => {
+    e.stopPropagation(); // Предотвращаем всплытие события к гексу
+    
+    if (editMode === 'units' && selectedUnit === null) {
+      // Если мы в режиме удаления юнита (выбрано "Удалить юнит")
+      const updatedMap = hexMap.map(h => {
+        if (h.q === hex.q && h.r === hex.r && h.s === hex.s) {
+          // Удаляем юнит с гекса
+          const { unit, ...restHex } = h;
+          return restHex;
+        }
+        return h;
+      });
+      setHexMap(updatedMap);
+    }
+  };
+
+  const handleSvgMouseMove = useCallback((e: React.MouseEvent) => {
+    if (isDragging) {
+      const dx = e.clientX - dragStart.x;
+      const dy = e.clientY - dragStart.y;
+      setViewTransform(prev => ({
+        ...prev,
+        x: prev.x + dx,
+        y: prev.y + dy
+      }));
+      setDragStart({ x: e.clientX, y: e.clientY });
+    }
+  }, [isDragging, dragStart]);
+  
+  const handleSvgMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
   return (
     <div className="flex flex-col items-center w-full max-w-6xl mx-auto p-4 bg-gray-800 rounded-lg shadow-lg">
       <h1 className="text-2xl font-bold mb-4 text-white flex items-center">
@@ -1374,6 +1426,15 @@ const HexMapEditor = () => {
               <div className="flex justify-between items-center">
                 <h2 className="text-lg font-semibold">Режим редактирования</h2>
                 <div className="flex items-center space-x-2">
+                  <label className="text-gray-700 mr-4">
+                    <input 
+                      type="checkbox" 
+                      checked={showUnits} 
+                      onChange={() => setShowUnits(!showUnits)}
+                      className="mr-1"
+                    />
+                    Показать юниты
+                  </label>
                   <label className="text-gray-700">Ориентация:</label>
                   <select
                     value={orientation}
@@ -1580,9 +1641,18 @@ const HexMapEditor = () => {
                   <defs>
                     {terrainTypes.filter(terrain => terrain.pattern).map(terrain => terrain.pattern)}
                   </defs>
+                  
+                  {/* Рендерим сначала все потенциальные гексы */}
+                  {editMode === 'manage' && manageAction === 'add' && renderPotentialHexes()}
+                  
+                  {/* Рендерим все обычные гексы */}
                   <g>
-                    {editMode === 'manage' && manageAction === 'add' && renderPotentialHexes()}
                     {visibleHexes.map(renderHexSVG)}
+                  </g>
+                  
+                  {/* Рендерим все юниты поверх гексов */}
+                  <g style={{ pointerEvents: 'all' }}>
+                    {visibleHexes.map(renderUnitSVG)}
                   </g>
                 </svg>
                 <div className="absolute bottom-2 right-2 bg-white bg-opacity-75 p-2 rounded text-xs">

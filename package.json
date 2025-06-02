@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "start": "node server.js",
     "exe": "pkg .",
-    "make-exe": "nexe server-script.cjs -o artifact-viewer.exe --build"
+    "make-exe": "nexe server-script.cjs -o artifact-viewer.exe --build",
+    "build-and-serve": "npm run build && npm run start"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
