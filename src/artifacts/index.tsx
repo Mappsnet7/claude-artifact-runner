@@ -80,6 +80,13 @@ const terrainTypes = [
     )
   },
   { 
+    id: 'void', 
+    name: 'Пустота', 
+    color: '#808080', 
+    height: 0,
+    pattern: null
+  },
+  { 
     id: 'water', 
     name: 'Водоём', 
     color: '#2196F3', 
@@ -90,18 +97,6 @@ const terrainTypes = [
         <path d="M0,5 Q5,3 10,5 Q15,7 20,5" stroke="#1976D2" strokeWidth="1" fill="none" />
         <path d="M0,10 Q5,8 10,10 Q15,12 20,10" stroke="#1976D2" strokeWidth="1" fill="none" />
         <path d="M0,15 Q5,13 10,15 Q15,17 20,15" stroke="#1976D2" strokeWidth="1" fill="none" />
-      </pattern>
-    )
-  },
-  { 
-    id: 'mountains', 
-    name: 'Горы', 
-    color: '#795548', 
-    height: 0.8,
-    pattern: (
-      <pattern id="mountainsPattern" patternUnits="userSpaceOnUse" width="20" height="20">
-        <rect width="20" height="20" fill="#795548" />
-        <path d="M3,15 L10,5 L17,15 Z" fill="#5d4037" stroke="#4e342e" strokeWidth="0.5" />
       </pattern>
     )
   },
@@ -147,6 +142,7 @@ const HexMapEditor = () => {
   const [selectedUnit, setSelectedUnit] = useState<typeof unitTypes[0] | null>(null);
   const [showTerrainGenerator, setShowTerrainGenerator] = useState(false);
   const [showUnits, setShowUnits] = useState(true); // Состояние для отображения/скрытия юнитов
+  const [maxPlayerUnits, setMaxPlayerUnits] = useState(8); // Максимальное количество шашек игрока
   
   // Состояния для управления видом 2D карты
   const [viewTransform, setViewTransform] = useState({ scale: 1, x: 0, y: 0 });
@@ -458,7 +454,8 @@ const HexMapEditor = () => {
     // Форматируем JSON с отступами для лучшей читаемости
     const jsonData = JSON.stringify({ 
       hexes: [...cleanedMap, ...emptyCoordinates], 
-      mapRadius 
+      mapRadius,
+      maxPlayerUnits
     }, null, 2);
     
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(jsonData);
@@ -647,27 +644,10 @@ const HexMapEditor = () => {
               ctx.stroke();
             }
             break;
-            
-          case 'mountains':
-            // Рисуем горы
-            ctx.fillStyle = '#5d4037';
-            ctx.beginPath();
-            ctx.moveTo(0, 128);
-            ctx.lineTo(40, 30);
-            ctx.lineTo(70, 90);
-            ctx.lineTo(100, 20);
-            ctx.lineTo(128, 128);
-            ctx.fill();
-            // Добавляем снег на вершинах
-            ctx.fillStyle = '#e0e0e0';
-            ctx.beginPath();
-            ctx.moveTo(35, 40);
-            ctx.lineTo(40, 30);
-            ctx.lineTo(45, 40);
-            ctx.moveTo(95, 30);
-            ctx.lineTo(100, 20);
-            ctx.lineTo(105, 30);
-            ctx.fill();
+
+          case 'void':
+            // Без дополнительных деталей — однотонная серая плитка
+            // Фон уже залит основным цветом
             break;
             
           default:
@@ -727,7 +707,7 @@ const HexMapEditor = () => {
           
           // Создаем экструдированную геометрию (призму)
           const extrudeSettings = {
-            depth: hex.height > 0 ? hex.height : 0.1,
+            depth: hex.terrainType === 'void' ? 0 : (hex.height > 0 ? hex.height : 0.1),
             bevelEnabled: false
           };
           
@@ -1145,13 +1125,14 @@ const HexMapEditor = () => {
         const jsonData = JSON.parse(e.target?.result as string);
         
         // Проверяем структуру данных
-        if (!jsonData.hexes || !Array.isArray(jsonData.hexes) || !jsonData.mapRadius) {
-          throw new Error('Неверный формат файла');
+        if (!jsonData.hexes || !Array.isArray(jsonData.hexes) || typeof jsonData.mapRadius !== 'number') {
+          throw new Error('Неверный формат файла: отсутствует hexes или mapRadius');
         }
 
         // Сначала создаем полную карту с полями
         const fieldTerrain = terrainTypes.find(t => t.id === 'field') || terrainTypes[0];
         const radius = jsonData.mapRadius;
+        const importedMaxPlayerUnits = typeof jsonData.maxPlayerUnits === 'number' ? jsonData.maxPlayerUnits : 8; // Значение по умолчанию, если отсутствует
         const fullMap: Array<{q: number; r: number; s: number; terrainType: string; color: string; height: number; unit?: {type: string; icon: string; color: string} }> = [];
         
         // Создаем базовую карту с полями
@@ -1220,6 +1201,7 @@ const HexMapEditor = () => {
         setHexMap(fullMap);
         setHexCount(visibleHexCount);
         setShowSizeInput(false);
+        setMaxPlayerUnits(importedMaxPlayerUnits); // Устанавливаем импортированное или значение по умолчанию
         
         // Сбрасываем вид
         setViewTransform({ scale: 1, x: 0, y: 0 });
@@ -1389,6 +1371,16 @@ const HexMapEditor = () => {
                 max="20"
               />
             </div>
+            <div className="flex items-center">
+              <label className="w-32 text-gray-700">Макс. шашек игрока:</label>
+              <input
+                type="number"
+                value={maxPlayerUnits}
+                onChange={(e) => setMaxPlayerUnits(parseInt(e.target.value) || 0)}
+                className="border rounded px-3 py-2 w-24 text-center"
+                min="0"
+              />
+            </div>
             <div className="text-sm text-gray-600 ml-32">
               Примерное количество гексов: {3 * mapRadius * (mapRadius + 1) + 1}
             </div>
@@ -1435,6 +1427,14 @@ const HexMapEditor = () => {
                     />
                     Показать юниты
                   </label>
+                  <label className="text-gray-700 mr-2">Макс. шашек игрока:</label>
+                  <input
+                    type="number"
+                    value={maxPlayerUnits}
+                    onChange={(e) => setMaxPlayerUnits(parseInt(e.target.value) || 0)}
+                    className="border rounded px-2 py-1 w-16 text-center mr-4"
+                    min="0"
+                  />
                   <label className="text-gray-700">Ориентация:</label>
                   <select
                     value={orientation}
@@ -1589,6 +1589,9 @@ const HexMapEditor = () => {
                 <div className="flex flex-col items-end">
                   <span className="text-sm text-gray-600">
                     Радиус карты: {mapRadius}
+                  </span>
+                  <span className="text-sm text-gray-600">
+                    Макс. шашек игрока: {maxPlayerUnits}
                   </span>
                   <span className="text-sm text-gray-600">
                     Количество гексов: {hexCount}
@@ -1759,6 +1762,9 @@ const HexMapEditor = () => {
                   onClick={() => {
                     setHexMap([]);
                     setShowSizeInput(true);
+                    // Примечание: maxPlayerUnits не сбрасывается здесь намеренно,
+                    // чтобы пользователь мог его настроить на экране создания карты.
+                    // Если нужен полный сброс, добавьте setMaxPlayerUnits(10);
                   }}
                   className="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg shadow-md flex items-center justify-center transition-all duration-200 col-span-2 transform hover:scale-105"
                 >

@@ -96,7 +96,7 @@ export class TerrainGenerator {
         } else if (random < fieldProb + hillsProb + forestProb + swampProb + buildingsProb + waterProb) {
           terrainType = 'water';
         } else {
-          terrainType = 'mountains';
+          terrainType = 'hills';
         }
         
         // Получаем информацию о выбранном типе местности
@@ -163,8 +163,8 @@ export class TerrainGenerator {
           // Вода на низких высотах
           terrainType = 'water';
         } else if (elevation > mountainsLevel) {
-          // Горы на высоких высотах
-          terrainType = 'mountains';
+          // Раньше здесь были горы, заменяем на холмы
+          terrainType = 'hills';
         } else if (elevation > hillsThreshold) {
           // Холмы на средне-высоких высотах
           terrainType = 'hills';
@@ -249,7 +249,7 @@ export class TerrainGenerator {
         } else if (elevation < 0.85) {
           terrainType = 'hills'; // Холмы
         } else {
-          terrainType = 'mountains'; // Горы в центре
+          terrainType = 'hills'; // Раньше были горы в центре
         }
         
         // В случайных местах добавляем здания
@@ -310,7 +310,7 @@ export class TerrainGenerator {
         // Матрица биомов
         if (temperature < 0.3) {
           // Холодно
-          if (moisture < 0.3) terrainType = 'mountains'; // Холодно и сухо - горы
+          if (moisture < 0.3) terrainType = 'hills'; // Холодно и сухо - высокие холмы
           else if (moisture < 0.6) terrainType = 'hills'; // Холодно и умеренно - холмы
           else terrainType = 'swamp'; // Холодно и влажно - болота
         } else if (temperature < 0.7) {
@@ -401,25 +401,7 @@ export class TerrainGenerator {
         }
       }
       
-      // Изолированные горы окружаем холмами
-      if (hex.terrainType === 'mountains') {
-        const nonMountainNeighbors = neighbors.filter(n => n.terrainType !== 'mountains').length;
-        if (nonMountainNeighbors >= 4) {
-          for (let j = 0; j < neighbors.length; j++) {
-            if (neighbors[j].terrainType !== 'mountains' && neighbors[j].terrainType !== 'water' && this.rng() > 0.5) {
-              const idx = processedMap.findIndex(h => 
-                h.q === neighbors[j].q && h.r === neighbors[j].r && h.s === neighbors[j].s
-              );
-              if (idx !== -1) {
-                processedMap[idx].terrainType = 'hills';
-                const terrain = this.terrainTypes.find(t => t.id === 'hills') || this.terrainTypes[0];
-                processedMap[idx].color = terrain.color;
-                processedMap[idx].height = terrain.height;
-              }
-            }
-          }
-        }
-      }
+      // Блок обработки гор удалён, т.к. тип 'mountains' больше не используется
       
       // Редко добавляем леса рядом с болотами
       if (hex.terrainType === 'field') {
