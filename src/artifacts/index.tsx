@@ -4,7 +4,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import TerrainGeneratorPanel from './TerrainGeneratorPanel';
 import { 
   FaSave, FaUndo, FaTimes, FaUpload, FaCube,
-  FaRuler, FaEdit, FaFile, FaEye
+  FaRuler, FaEdit, FaFile, FaEye, FaWater
 } from 'react-icons/fa';
 import { RiMapFill, RiEarthLine } from 'react-icons/ri';
 
@@ -126,6 +126,16 @@ const unitTypes = [
   { id: 'tank', name: 'Танк', icon: '🔘', color: '#212121' }
 ];
 
+// Типы для рек
+type Point = { x: number; y: number };
+type River = { 
+  id: string; 
+  points: Point[]; 
+  thickness: number; 
+  smoothingEnabled: boolean; 
+};
+type Vertex = { q: number; r: number; s: number; index: number; x: number; y: number };
+
 // Основной компонент редактора карт
 const HexMapEditor = () => {
   // Состояния для размеров карты
@@ -137,13 +147,23 @@ const HexMapEditor = () => {
   const [isDrawing, setIsDrawing] = useState(false);
   const [orientation, setOrientation] = useState<'flat' | 'pointy'>('flat');
   const [hexCount, setHexCount] = useState(0);
-  const [editMode, setEditMode] = useState<'terrain' | 'units' | 'manage'>('terrain');
+  const [editMode, setEditMode] = useState<'terrain' | 'units' | 'manage' | 'rivers'>('terrain');
   const [manageAction, setManageAction] = useState<'add' | 'delete'>('add');
   const [selectedUnit, setSelectedUnit] = useState<typeof unitTypes[0] | null>(null);
   const [showTerrainGenerator, setShowTerrainGenerator] = useState(false);
   const [showUnits, setShowUnits] = useState(true); // Состояние для отображения/скрытия юнитов
   const [maxPlayerUnits, setMaxPlayerUnits] = useState(8); // Максимальное количество шашек игрока
   
+  // Состояния для рек
+  const [rivers, setRivers] = useState<River[]>([]);
+  const [selectedRiverId, setSelectedRiverId] = useState<string | null>(null);
+  const [hoveredVertex, setHoveredVertex] = useState<Vertex | null>(null);
+  const [allVertices, setAllVertices] = useState<Vertex[]>([]);
+
+  // Состояния для перетаскивания точек реки
+  const [isDraggingPoint, setIsDraggingPoint] = useState(false);
+  const [draggedPointInfo, setDraggedPointInfo] = useState<{ riverId: string; pointIndex: number } | null>(null);
+
   // Состояния для управления видом 2D карты
   const [viewTransform, setViewTransform] = useState({ scale: 1, x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -222,6 +242,51 @@ const HexMapEditor = () => {
       return { x, y };
     }
   }, [orientation]);
+  
+  // Функция для получения вершин гекса
+  const getHexVertices = useCallback((hex: { q: number; r: number; s: number }) => {
+    const { x, y } = getHexPosition(hex.q, hex.r);
+    const size = 20;
+    const vertices: Point[] = [];
+    for (let i = 0; i < 6; i++) {
+      // Правильный расчет углов для вершин гекса
+      const angle = (Math.PI / 3) * i + (orientation === 'pointy' ? Math.PI / 6 : 0);
+      vertices.push({
+        x: x + size * Math.cos(angle),
+        y: y + size * Math.sin(angle),
+      });
+    }
+    return vertices;
+  }, [getHexPosition, orientation]);
+
+  useEffect(() => {
+    if (editMode === 'rivers') {
+      const vertices: Vertex[] = [];
+      hexMap.forEach(hex => {
+        if (hex.terrainType !== 'empty') {
+          // Добавляем вершины гекса
+          const hexVertices = getHexVertices(hex);
+          hexVertices.forEach((vertex, index) => {
+            vertices.push({ ...vertex, q: hex.q, r: hex.r, s: hex.s, index });
+          });
+          
+          // Добавляем центр гекса как дополнительную точку привязки
+          const { x, y } = getHexPosition(hex.q, hex.r);
+          vertices.push({ 
+            x, 
+            y, 
+            q: hex.q, 
+            r: hex.r, 
+            s: hex.s, 
+            index: -1 // Специальный индекс для центра
+          });
+        }
+      });
+      setAllVertices(vertices);
+    } else {
+      setAllVertices([]);
+    }
+  }, [editMode, hexMap, getHexVertices, getHexPosition]);
   
   // Функция для получения всех возможных координат гексов в пределах радиуса
   // Эта функция не используется и была удалена
@@ -355,43 +420,14 @@ const HexMapEditor = () => {
     }
   };
   
-  // Обработчик колесика мыши для масштабирования
-  const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault();
-    const scaleFactor = e.deltaY < 0 ? 1.1 : 0.9;
-    
-    // Получаем позицию курсора относительно SVG
-    const svgRect = svgElement.current?.getBoundingClientRect();
-    if (!svgRect) return;
-    
-    const mouseX = e.clientX - svgRect.left;
-    const mouseY = e.clientY - svgRect.top;
-    
-    setViewTransform(prev => {
-      // Вычисляем новый масштаб
-      const newScale = prev.scale * scaleFactor;
-      
-      // Ограничиваем масштаб
-      const limitedScale = Math.min(Math.max(newScale, 0.2), 3);
-      
-      // Вычисляем новые координаты с учетом позиции курсора
-      const scaleRatio = limitedScale / prev.scale;
-      const newX = mouseX - (mouseX - prev.x) * scaleRatio;
-      const newY = mouseY - (mouseY - prev.y) * scaleRatio;
-      
-      return {
-        scale: limitedScale,
-        x: newX,
-        y: newY
-      };
-    });
-  }, []);
   
   // Устанавливаем обработчики событий для документа
   useEffect(() => {
     const handleGlobalMouseUp = () => {
       setIsDragging(false);
       setIsDrawing(false);
+      setIsDraggingPoint(false);
+      setDraggedPointInfo(null);
     };
     
     const handleContextMenu = (e: MouseEvent) => {
@@ -403,10 +439,44 @@ const HexMapEditor = () => {
     
     document.addEventListener('mouseup', handleGlobalMouseUp);
     document.addEventListener('contextmenu', handleContextMenu);
+
+    const container = svgContainer.current;
+    const handleWheelEvent = (e: WheelEvent) => {
+        e.preventDefault();
+        
+        const scaleFactor = e.deltaY < 0 ? 1.1 : 0.9;
+        
+        const svgRect = svgElement.current?.getBoundingClientRect();
+        if (!svgRect) return;
+        
+        const mouseX = e.clientX - svgRect.left;
+        const mouseY = e.clientY - svgRect.top;
+        
+        setViewTransform(prev => {
+          const newScale = prev.scale * scaleFactor;
+          const limitedScale = Math.min(Math.max(newScale, 0.2), 3);
+          const scaleRatio = limitedScale / prev.scale;
+          const newX = mouseX - (mouseX - prev.x) * scaleRatio;
+          const newY = mouseY - (mouseY - prev.y) * scaleRatio;
+          
+          return {
+            scale: limitedScale,
+            x: newX,
+            y: newY
+          };
+        });
+    };
+    
+    if (container) {
+      container.addEventListener('wheel', handleWheelEvent, { passive: false });
+    }
     
     return () => {
       document.removeEventListener('mouseup', handleGlobalMouseUp);
       document.removeEventListener('contextmenu', handleContextMenu);
+      if (container) {
+        container.removeEventListener('wheel', handleWheelEvent);
+      }
     };
   }, []);
   
@@ -455,7 +525,8 @@ const HexMapEditor = () => {
     const jsonData = JSON.stringify({ 
       hexes: [...cleanedMap, ...emptyCoordinates], 
       mapRadius,
-      maxPlayerUnits
+      maxPlayerUnits,
+      rivers: rivers
     }, null, 2);
     
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(jsonData);
@@ -961,7 +1032,7 @@ const HexMapEditor = () => {
           if (editMode === 'manage' && manageAction === 'delete') {
             handleHexClick(hex);
             e.stopPropagation();
-          } else {
+          } else if (editMode !== 'rivers') {
             handleMouseDown(hex, e);
           }
         }}
@@ -1127,6 +1198,18 @@ const HexMapEditor = () => {
         // Проверяем структуру данных
         if (!jsonData.hexes || !Array.isArray(jsonData.hexes) || typeof jsonData.mapRadius !== 'number') {
           throw new Error('Неверный формат файла: отсутствует hexes или mapRadius');
+        }
+
+        if (jsonData.rivers && Array.isArray(jsonData.rivers)) {
+          // Обеспечиваем обратную совместимость - добавляем значения по умолчанию для старых файлов
+          const riversWithDefaults = jsonData.rivers.map((river: any) => ({
+            ...river,
+            thickness: river.thickness || 3,
+            smoothingEnabled: river.smoothingEnabled ?? true
+          }));
+          setRivers(riversWithDefaults);
+        } else {
+          setRivers([]);
         }
 
         // Сначала создаем полную карту с полями
@@ -1341,11 +1424,197 @@ const HexMapEditor = () => {
       }));
       setDragStart({ x: e.clientX, y: e.clientY });
     }
-  }, [isDragging, dragStart]);
+    
+    if (editMode === 'rivers' && svgElement.current) {
+      // Используем встроенный метод SVG для правильного преобразования координат
+      const svg = svgElement.current;
+      const ctm = svg.getScreenCTM();
+      
+      if (!ctm) return;
+      
+      const pt = svg.createSVGPoint();
+      pt.x = e.clientX;
+      pt.y = e.clientY;
+      
+      // Преобразуем координаты экрана в координаты SVG с учетом всех трансформаций
+      const svgP = pt.matrixTransform(ctm.inverse());
+      const mouseX = svgP.x;
+      const mouseY = svgP.y;
+
+      let closestVertex: Vertex | null = null;
+      let minDistance = Infinity;
+
+      allVertices.forEach(vertex => {
+        const distance = Math.sqrt(Math.pow(vertex.x - mouseX, 2) + Math.pow(vertex.y - mouseY, 2));
+        // Уменьшаем порог привязки при перетаскивании для более точного контроля
+        const snapThreshold = isDraggingPoint ? 8 : 15;
+        if (distance < minDistance && distance < snapThreshold) {
+          minDistance = distance;
+          closestVertex = vertex;
+        }
+      });
+
+      setHoveredVertex(closestVertex);
+
+      if (isDraggingPoint && draggedPointInfo) {
+        setRivers(prevRivers =>
+          prevRivers.map(river => {
+            if (river.id === draggedPointInfo.riverId) {
+              const newPoints = [...river.points];
+              // Если есть ближайшая вершина, привязываемся к ней, иначе используем координаты мыши
+              if (closestVertex) {
+                newPoints[draggedPointInfo.pointIndex] = { x: closestVertex.x, y: closestVertex.y };
+              } else {
+                // Свободное перетаскивание без привязки к вершинам
+                newPoints[draggedPointInfo.pointIndex] = { x: mouseX, y: mouseY };
+              }
+              return { ...river, points: newPoints };
+            }
+            return river;
+          })
+        );
+      }
+    }
+  }, [isDragging, dragStart, editMode, allVertices, viewTransform, isDraggingPoint, draggedPointInfo]);
   
+  const handleCanvasClick = useCallback(() => {
+    if (editMode === 'rivers' && hoveredVertex && selectedRiverId) {
+      setRivers(prevRivers =>
+        prevRivers.map(river => {
+          if (river.id === selectedRiverId) {
+            // Проверяем, не добавляем ли мы точку слишком близко к уже существующей
+            const newPoint = { x: hoveredVertex.x, y: hoveredVertex.y };
+            const tooClose = river.points.some(point => 
+              Math.sqrt(Math.pow(point.x - newPoint.x, 2) + Math.pow(point.y - newPoint.y, 2)) < 5
+            );
+            
+            if (!tooClose) {
+              return { ...river, points: [...river.points, newPoint] };
+            }
+          }
+          return river;
+        })
+      );
+    }
+  }, [editMode, hoveredVertex, selectedRiverId]);
+
   const handleSvgMouseUp = useCallback(() => {
     setIsDragging(false);
+    setIsDraggingPoint(false);
+    setDraggedPointInfo(null);
   }, []);
+
+  // Функция для отрисовки рек
+  const renderRivers = () => {
+    return rivers.map(river => {
+      if (river.points.length === 0) {
+        return null;
+      }
+      
+      // Если только одна точка, показываем её как круг
+      if (river.points.length === 1 && river.id === selectedRiverId) {
+        return (
+          <g key={river.id}>
+            <circle
+              cx={river.points[0].x}
+              cy={river.points[0].y}
+              r="4"
+              fill={isDraggingPoint && draggedPointInfo?.riverId === river.id && draggedPointInfo?.pointIndex === 0 ? "orange" : "red"}
+              style={{ cursor: isDraggingPoint ? 'grabbing' : 'grab' }}
+              onMouseDown={(e) => {
+                if (e.button === 0) {
+                  e.stopPropagation();
+                  setIsDraggingPoint(true);
+                  setDraggedPointInfo({ riverId: river.id, pointIndex: 0 });
+                }
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setRivers(prevRivers =>
+                  prevRivers.map(r =>
+                    r.id === river.id
+                      ? { ...r, points: [] }
+                      : r
+                  )
+                );
+              }}
+            />
+          </g>
+        );
+      }
+      
+      if (river.points.length < 2) {
+        return null;
+      }
+
+      // Создаем путь для реки с учетом настроек сглаживания
+      let pathData = `M ${river.points[0].x} ${river.points[0].y}`;
+      
+      if (!river.smoothingEnabled || river.points.length === 2) {
+        // Без сглаживания или для двух точек - просто прямые линии
+        for (let i = 1; i < river.points.length; i++) {
+          pathData += ` L ${river.points[i].x} ${river.points[i].y}`;
+        }
+      } else {
+        // Со сглаживанием - используем простые кривые Безье
+        for (let i = 1; i < river.points.length; i++) {
+          const prev = river.points[i - 1];
+          const current = river.points[i];
+          
+          if (i === 1) {
+            // Первый сегмент - прямая линия
+            pathData += ` L ${current.x} ${current.y}`;
+          } else {
+            // Остальные сегменты - квадратичные кривые для плавности
+            const prevPrev = river.points[i - 2];
+            const controlX = prev.x + (current.x - prevPrev.x) * 0.1;
+            const controlY = prev.y + (current.y - prevPrev.y) * 0.1;
+            
+            pathData += ` Q ${controlX} ${controlY}, ${current.x} ${current.y}`;
+          }
+        }
+      }
+
+      return (
+        <g key={river.id}>
+          <path
+            d={pathData}
+            stroke="blue"
+            strokeWidth={river.thickness}
+            fill="none"
+            opacity={0.7}
+          />
+          {river.id === selectedRiverId && river.points.map((point, index) => (
+            <circle
+              key={index}
+              cx={point.x}
+              cy={point.y}
+              r="4"
+              fill={isDraggingPoint && draggedPointInfo?.riverId === river.id && draggedPointInfo?.pointIndex === index ? "orange" : "red"}
+              style={{ cursor: isDraggingPoint ? 'grabbing' : 'grab' }}
+              onMouseDown={(e) => {
+                if (e.button === 0) { // Left click to drag
+                  e.stopPropagation();
+                  setIsDraggingPoint(true);
+                  setDraggedPointInfo({ riverId: river.id, pointIndex: index });
+                }
+              }}
+              onContextMenu={(e) => { // Right click to delete
+                e.preventDefault();
+                setRivers(prevRivers =>
+                  prevRivers.map(r =>
+                    r.id === river.id
+                      ? { ...r, points: r.points.filter((_, i) => i !== index) }
+                      : r
+                  )
+                );
+              }}
+            />
+          ))}
+        </g>
+      );
+    });
+  };
 
   return (
     <div className="flex flex-col items-center w-full max-w-6xl mx-auto p-4 bg-gray-800 rounded-lg shadow-lg">
@@ -1472,6 +1741,15 @@ const HexMapEditor = () => {
                 >
                   Управление гексами
                 </button>
+                <button
+                  onClick={() => setEditMode('rivers')}
+                  className={`px-3 py-2 rounded-md ${
+                    editMode === 'rivers' ? 'bg-blue-600 text-white' : 'bg-gray-200'
+                  }`}
+                >
+                  <FaWater className="inline-block mr-2" />
+                  Реки
+                </button>
               </div>
               
               {editMode === 'terrain' ? (
@@ -1519,6 +1797,160 @@ const HexMapEditor = () => {
                     Выберите тип юнита и кликните по гексу для его размещения. 
                     Выберите "Удалить юнит" для удаления юнита с гекса.
                   </p>
+                </div>
+              ) : editMode === 'manage' ? (
+                // Панель для управления гексами (добавление/удаление)
+                <div>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    <button
+                      onClick={() => setManageAction('add')}
+                      className={`px-3 py-2 rounded-md bg-green-500 text-white shadow ${
+                        manageAction === 'add' ? 'ring-2 ring-black' : ''
+                      }`}
+                    >
+                      Добавить гексы
+                    </button>
+                    <button
+                      onClick={() => setManageAction('delete')}
+                      className={`px-3 py-2 rounded-md bg-red-500 text-white shadow ${
+                        manageAction === 'delete' ? 'ring-2 ring-black' : ''
+                      }`}
+                    >
+                      Удалить гексы
+                    </button>
+                  </div>
+                  {manageAction === 'add' && (
+                    <div>
+                      <p className="text-sm text-gray-600 mb-2">
+                        Кликните по полупрозрачным контурам, чтобы добавить гексы с выбранным типом местности:
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {terrainTypes.filter(terrain => terrain.id !== 'empty').map(terrain => (
+                          <button
+                            key={terrain.id}
+                            onClick={() => setSelectedTerrain(terrain)}
+                            className={`px-3 py-2 rounded-md text-white shadow ${
+                              selectedTerrain.id === terrain.id ? 'ring-2 ring-black' : ''
+                            }`}
+                            style={{ backgroundColor: terrain.color }}
+                          >
+                            {terrain.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {manageAction === 'delete' && (
+                    <p className="text-sm text-gray-600">
+                      Кликните по существующему гексу, чтобы удалить его с карты.
+                    </p>
+                  )}
+                </div>
+              ) : editMode === 'rivers' ? (
+                // Панель для управления реками
+                <div>
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    <button
+                      onClick={() => {
+                        const newRiverId = `river-${Date.now()}`;
+                        setRivers([...rivers, { 
+                          id: newRiverId, 
+                          points: [], 
+                          thickness: 3, 
+                          smoothingEnabled: true 
+                        }]);
+                        setSelectedRiverId(newRiverId);
+                      }}
+                      className="px-3 py-2 rounded-md bg-green-500 text-white shadow"
+                    >
+                      Добавить реку
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (selectedRiverId) {
+                          setRivers(rivers.filter(r => r.id !== selectedRiverId));
+                          setSelectedRiverId(null);
+                        }
+                      }}
+                      disabled={!selectedRiverId}
+                      className="px-3 py-2 rounded-md bg-red-500 text-white shadow disabled:bg-gray-400"
+                    >
+                      Удалить выбранную реку
+                    </button>
+                  </div>
+                  <div className="mt-2">
+                    <p className="text-sm text-gray-600">Выберите реку для редактирования:</p>
+                    <div className="flex flex-col gap-1 mt-1">
+                      {rivers.length === 0 ? (
+                        <p className="text-xs text-gray-500 italic">Нет созданных рек. Нажмите "Добавить реку" для создания.</p>
+                      ) : (
+                        rivers.map((river, index) => (
+                          <button
+                            key={river.id}
+                            onClick={() => setSelectedRiverId(river.id)}
+                            className={`text-left px-2 py-1 rounded ${selectedRiverId === river.id ? 'bg-blue-200' : 'bg-gray-100'}`}
+                          >
+                            Река {index + 1} ({river.points.length} точек, толщина: {river.thickness}{river.smoothingEnabled ? ', сглаженная' : ', угловатая'})
+                          </button>
+                        ))
+                      )}
+                    </div>
+                    {!selectedRiverId && rivers.length > 0 && (
+                      <p className="text-xs text-orange-600 mt-1">⚠️ Выберите реку из списка выше для редактирования</p>
+                    )}
+                    {selectedRiverId && (
+                      <div className="mt-2">
+                        <p className="text-xs text-green-600 mb-2">ЛКМ на углы (синие круги) или центры (зеленые квадраты) гексов</p>
+                        <p className="text-xs text-red-600 mb-2">ПКМ по точке для удаления</p>
+                        <div className="space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <label className="text-xs text-gray-600 w-16">Толщина:</label>
+                            <input
+                              type="range"
+                              min="1"
+                              max="30"
+                              step="0.5"
+                              value={rivers.find(r => r.id === selectedRiverId)?.thickness || 3}
+                              onChange={(e) => {
+                                const newThickness = parseFloat(e.target.value);
+                                setRivers(prevRivers =>
+                                  prevRivers.map(river =>
+                                    river.id === selectedRiverId
+                                      ? { ...river, thickness: newThickness }
+                                      : river
+                                  )
+                                );
+                              }}
+                              className="flex-1"
+                            />
+                            <span className="text-xs text-gray-600 w-8">
+                              {rivers.find(r => r.id === selectedRiverId)?.thickness || 3}
+                            </span>
+                          </div>
+                          
+                          <div className="flex items-center space-x-2">
+                            <label className="text-xs text-gray-600">
+                              <input
+                                type="checkbox"
+                                checked={rivers.find(r => r.id === selectedRiverId)?.smoothingEnabled ?? true}
+                                onChange={(e) => {
+                                  setRivers(prevRivers =>
+                                    prevRivers.map(river =>
+                                      river.id === selectedRiverId
+                                        ? { ...river, smoothingEnabled: e.target.checked }
+                                        : river
+                                    )
+                                  );
+                                }}
+                                className="mr-1"
+                              />
+                              Сглаживание
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
               ) : (
                 // Панель для управления гексами (добавление/удаление)
@@ -1626,9 +2058,12 @@ const HexMapEditor = () => {
                 style={{ height: '70vh', cursor: isDragging ? 'grabbing' : editMode === 'manage' ? (manageAction === 'add' ? 'crosshair' : 'not-allowed') : 'grab' }}
                 onMouseDown={handleSvgMouseDown}
                 onMouseMove={handleSvgMouseMove}
-                onMouseUp={handleSvgMouseUp}
+                onMouseUp={() => {
+                  handleSvgMouseUp();
+                  handleCanvasClick();
+                }}
+                onClick={handleCanvasClick}
                 onMouseLeave={handleMouseUp}
-                onWheel={handleWheel}
               >
                 <svg 
                   ref={svgElement}
@@ -1642,7 +2077,11 @@ const HexMapEditor = () => {
                   }}
                 >
                   <defs>
-                    {terrainTypes.filter(terrain => terrain.pattern).map(terrain => terrain.pattern)}
+                    {terrainTypes.filter(terrain => terrain.pattern).map(terrain => (
+                      <React.Fragment key={terrain.id}>
+                        {terrain.pattern}
+                      </React.Fragment>
+                    ))}
                   </defs>
                   
                   {/* Рендерим сначала все потенциальные гексы */}
@@ -1653,6 +2092,35 @@ const HexMapEditor = () => {
                     {visibleHexes.map(renderHexSVG)}
                   </g>
                   
+                  {renderRivers()}
+
+                  {editMode === 'rivers' && hoveredVertex && (
+                    hoveredVertex.index === -1 ? (
+                      // Центр гекса - отображаем квадратом
+                      <rect
+                        x={hoveredVertex.x - 4}
+                        y={hoveredVertex.y - 4}
+                        width="8"
+                        height="8"
+                        fill="rgba(0, 255, 0, 0.6)"
+                        stroke="green"
+                        strokeWidth="2"
+                        style={{ pointerEvents: 'none' }}
+                      />
+                    ) : (
+                      // Вершина гекса - отображаем кругом
+                      <circle
+                        cx={hoveredVertex.x}
+                        cy={hoveredVertex.y}
+                        r="5"
+                        fill="rgba(0, 0, 255, 0.5)"
+                        stroke="blue"
+                        strokeWidth="2"
+                        style={{ pointerEvents: 'none' }}
+                      />
+                    )
+                  )}
+
                   {/* Рендерим все юниты поверх гексов */}
                   <g style={{ pointerEvents: 'all' }}>
                     {visibleHexes.map(renderUnitSVG)}
@@ -1664,8 +2132,18 @@ const HexMapEditor = () => {
                   <p>Левая кнопка мыши: {
                     editMode === 'manage' 
                       ? (manageAction === 'add' ? 'добавление гексов' : 'удаление гексов') 
-                      : 'рисование'
+                      : editMode === 'rivers' ? 'добавление точек реки' : 'рисование'
                   }</p>
+                  {editMode === 'rivers' && (
+                    <div className="mt-1 pt-1 border-t border-gray-300">
+                      <p>Вершин: {allVertices.length}</p>
+                      <p>Выбрана река: {selectedRiverId ? 'Да' : 'Нет'}</p>
+                      <p>Подсвечена вершина: {hoveredVertex ? 'Да' : 'Нет'}</p>
+                      {hoveredVertex && (
+                        <p>Позиция: ({Math.round(hoveredVertex.x)}, {Math.round(hoveredVertex.y)}) - {hoveredVertex.index === -1 ? 'Центр' : 'Угол'}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
