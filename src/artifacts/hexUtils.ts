@@ -6,29 +6,27 @@ export function normalizeAdditionalMiddleRows(additionalRows: number): number {
   return normalized;
 }
 
-export function calculateRowExtension(q: number, additionalMiddleRows: number): number {
+function clampMagnitudeTowardsCenter(q: number, additionalMiddleRows: number): number {
+  if (q === 0) {
+    return 0;
+  }
+
   const normalizedRows = normalizeAdditionalMiddleRows(additionalMiddleRows);
   if (normalizedRows === 0) {
-    return 0;
+    return q;
   }
 
-  const distanceFromCenter = Math.abs(q);
-  if (distanceFromCenter > normalizedRows) {
-    return 0;
-  }
-
-  return normalizedRows - distanceFromCenter;
+  const magnitude = Math.abs(q);
+  const reducedMagnitude = Math.max(0, magnitude - normalizedRows);
+  return q < 0 ? -reducedMagnitude : reducedMagnitude;
 }
 
 export function getRowBounds(radius: number, q: number, additionalMiddleRows: number): { start: number; end: number } {
-  const baseR1 = Math.max(-radius, -q - radius);
-  const baseR2 = Math.min(radius, -q + radius);
-  const extension = calculateRowExtension(q, additionalMiddleRows);
+  const clampedQ = clampMagnitudeTowardsCenter(q, additionalMiddleRows);
+  const start = Math.max(-radius, -clampedQ - radius);
+  const end = Math.min(radius, -clampedQ + radius);
 
-  return {
-    start: baseR1 - extension,
-    end: baseR2 + extension,
-  };
+  return { start, end };
 }
 
 export function countHexes(radius: number, additionalMiddleRows: number): number {
