@@ -79,3 +79,72 @@ export function getLogicalPositionKey(q: number, r: number, additionalMiddleRows
   // Центральная полоса (включая добавленные колонки)
   return `center:${q}:${r}`;
 }
+
+export const DEFAULT_HEX_SIZE = 20;
+export const POINTY_TO_FLAT_ROTATION = -Math.PI / 6;
+
+const COS_ROTATION = Math.cos(POINTY_TO_FLAT_ROTATION);
+const SIN_ROTATION = Math.sin(POINTY_TO_FLAT_ROTATION);
+
+export function rotatePoint(
+  x: number,
+  y: number,
+  cosAngle: number = COS_ROTATION,
+  sinAngle: number = SIN_ROTATION
+): { x: number; y: number } {
+  return {
+    x: x * cosAngle - y * sinAngle,
+    y: x * sinAngle + y * cosAngle
+  };
+}
+
+export function axialToPointyPixel(
+  q: number,
+  r: number,
+  size: number = DEFAULT_HEX_SIZE
+): { x: number; y: number } {
+  return {
+    x: size * Math.sqrt(3) * (q + r / 2),
+    y: size * (3 / 2) * r
+  };
+}
+
+export function axialToFlatPixel(
+  q: number,
+  r: number,
+  size: number = DEFAULT_HEX_SIZE
+): { x: number; y: number } {
+  const { x, y } = axialToPointyPixel(q, r, size);
+  return rotatePoint(x, y);
+}
+
+export function getFlatTopHexVertices(
+  q: number,
+  r: number,
+  size: number = DEFAULT_HEX_SIZE
+): Array<{ x: number; y: number }> {
+  const centerPointy = axialToPointyPixel(q, r, size);
+  const vertices: Array<{ x: number; y: number }> = [];
+
+  for (let i = 0; i < 6; i++) {
+    const angle = Math.PI / 6 + i * (Math.PI / 3);
+    const offsetX = size * Math.cos(angle);
+    const offsetY = size * Math.sin(angle);
+    const vertexPointy = {
+      x: centerPointy.x + offsetX,
+      y: centerPointy.y + offsetY
+    };
+    vertices.push(rotatePoint(vertexPointy.x, vertexPointy.y));
+  }
+
+  return vertices;
+}
+
+export function axialToFlat3D(
+  q: number,
+  r: number,
+  scale: number = 1
+): { x: number; z: number } {
+  const { x, y } = axialToFlatPixel(q, r, scale);
+  return { x, z: y };
+}

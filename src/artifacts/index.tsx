@@ -12,7 +12,11 @@ import {
   getLogicalPositionKey,
   getQRange,
   getRowBounds,
-  normalizeAdditionalMiddleRows
+  normalizeAdditionalMiddleRows,
+  DEFAULT_HEX_SIZE,
+  axialToFlatPixel,
+  getFlatTopHexVertices,
+  axialToFlat3D
 } from './hexUtils';
 
 // Основные типы местности и их цвета
@@ -185,6 +189,8 @@ const HexMapEditor = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   
+  const HEX_SIZE = DEFAULT_HEX_SIZE;
+
   // Добавляем константу для масштаба юнитов (более реалистичный размер)
   const UNIT_SCALE = 2.0; // Масштаб юнитов относительно гекса
   
@@ -200,27 +206,13 @@ const HexMapEditor = () => {
   
   // Расчет позиции хекса с учетом ориентации в кубических координатах
   const getHexPosition = useCallback((q: number, r: number) => {
-    const size = 20;
-    const x = size * (3 / 2 * q);
-    const y = size * Math.sqrt(3) * (r + q / 2);
-    return { x, y };
-  }, []);
-  
+    return axialToFlatPixel(q, r, HEX_SIZE);
+  }, [HEX_SIZE]);
+
   // Функция для получения вершин гекса
   const getHexVertices = useCallback((hex: { q: number; r: number; s: number }) => {
-    const { x, y } = getHexPosition(hex.q, hex.r);
-    const size = 20;
-    const vertices: Point[] = [];
-    for (let i = 0; i < 6; i++) {
-      // Плоской стороной вверх (flat-top)
-      const angle = (Math.PI / 3) * i;
-      vertices.push({
-        x: x + size * Math.cos(angle),
-        y: y + size * Math.sin(angle),
-      });
-    }
-    return vertices;
-  }, [getHexPosition]);
+    return getFlatTopHexVertices(hex.q, hex.r, HEX_SIZE);
+  }, [HEX_SIZE]);
 
   useEffect(() => {
     if (editMode === 'rivers') {
@@ -765,8 +757,7 @@ const HexMapEditor = () => {
           hexMesh.receiveShadow = true;
           
           // Позиционируем хексы в 3D-просмотре с использованием кубических координат
-          const x = 1.5 * hex.q;
-          const z = Math.sqrt(3) * (hex.r + hex.q / 2);
+          const { x, z } = axialToFlat3D(hex.q, hex.r, 1);
           hexMesh.position.x = x;
           hexMesh.position.z = z;
           
@@ -930,7 +921,7 @@ const HexMapEditor = () => {
       // Фильтруем только видимые гексы
       const visible = hexMap.filter(hex => {
         const { x, y } = getHexPosition(hex.q, hex.r);
-        const size = 20;
+        const size = HEX_SIZE;
         
         // Проверяем, находится ли гекс в видимой области (с учетом размера гекса)
         return (
@@ -954,17 +945,8 @@ const HexMapEditor = () => {
   
   // Отрисовываем хекс SVG с координатами
   const renderHexSVG = (hex: {q: number; r: number; s: number; terrainType: string; color: string; height: number; unit?: {type: string; icon: string; color: string}}) => {
-    const { x, y } = getHexPosition(hex.q, hex.r);
-    const size = 20;
-    const points = [];
-    
-    for (let i = 0; i < 6; i++) {
-      // Плоской стороной вверх (flat-top)
-      const angle = (Math.PI / 3) * i;
-      const point_x = x + size * Math.cos(angle);
-      const point_y = y + size * Math.sin(angle);
-      points.push(`${point_x},${point_y}`);
-    }
+    const vertices = getHexVertices(hex);
+    const points = vertices.map(vertex => `${vertex.x},${vertex.y}`);
     
     // Определяем курсор и обработчики в зависимости от режима
     let cursorStyle = "pointer";
@@ -1003,7 +985,7 @@ const HexMapEditor = () => {
     if (!hex.unit || !showUnits) return null;
     
     const { x, y } = getHexPosition(hex.q, hex.r);
-    const size = 20;
+    const size = HEX_SIZE;
     
     return (
       <g key={`unit-${hex.q},${hex.r},${hex.s}`}>
@@ -1047,20 +1029,15 @@ const HexMapEditor = () => {
     let minY = 0;
     
     hexMap.forEach(hex => {
-      const { x, y } = getHexPosition(hex.q, hex.r);
-      const size = 20;
-      
+      const vertices = getHexVertices(hex);
+
       // Вычисляем крайние точки хекса
-      for (let i = 0; i < 6; i++) {
-        const angle = (Math.PI / 3) * i;
-        const pointX = x + size * Math.cos(angle);
-        const pointY = y + size * Math.sin(angle);
-        
-        maxX = Math.max(maxX, pointX);
-        maxY = Math.max(maxY, pointY);
-        minX = Math.min(minX, pointX);
-        minY = Math.min(minY, pointY);
-      }
+      vertices.forEach(vertex => {
+        maxX = Math.max(maxX, vertex.x);
+        maxY = Math.max(maxY, vertex.y);
+        minX = Math.min(minX, vertex.x);
+        minY = Math.min(minY, vertex.y);
+      });
     });
     
     // Добавляем отступы
@@ -1372,16 +1349,8 @@ const HexMapEditor = () => {
     const emptyHexes = hexMap.filter(hex => hex.terrainType === 'empty');
     
     return emptyHexes.map(hex => {
-      const { x, y } = getHexPosition(hex.q, hex.r);
-      const size = 20;
-      const points = [];
-      
-      for (let i = 0; i < 6; i++) {
-        const angle = (Math.PI / 3) * i;
-        const point_x = x + size * Math.cos(angle);
-        const point_y = y + size * Math.sin(angle);
-        points.push(`${point_x},${point_y}`);
-      }
+      const vertices = getHexVertices(hex);
+      const points = vertices.map(vertex => `${vertex.x},${vertex.y}`);
       
       // Используем шаблонное заполнение для потенциальных гексов
       return (
