@@ -1,5 +1,6 @@
 import { createNoise2D } from 'simplex-noise';
 import seedrandom from 'seedrandom';
+import { getRowBounds, normalizeAdditionalMiddleRows } from './hexUtils';
 
 // Определяем типы для хекса и типы ландшафта
 export type HexData = {
@@ -51,18 +52,19 @@ export class TerrainGenerator {
   }
 
   // Основной метод генерации ландшафта
-  generateTerrain(radius: number, params: GeneratorParams = {}): HexData[] {
+  generateTerrain(radius: number, params: GeneratorParams = {}, additionalMiddleRows: number = 0): HexData[] {
     // Выбираем метод генерации на основе параметров
     const generatorMethod = params.seed ? this.generateProceduralTerrain : this.generateRandomTerrain;
-    
+
     // Генерируем карту выбранным методом
-    return generatorMethod.call(this, radius, params);
+    return generatorMethod.call(this, radius, params, additionalMiddleRows);
   }
 
   // Метод 1: Полностью случайная генерация
-  private generateRandomTerrain(radius: number, params: GeneratorParams): HexData[] {
+  private generateRandomTerrain(radius: number, params: GeneratorParams, additionalMiddleRows: number = 0): HexData[] {
     const newMap: HexData[] = [];
-    
+    const normalizedRows = normalizeAdditionalMiddleRows(additionalMiddleRows);
+
     // Настраиваем вероятности для разных типов местности
     const fieldProb = 0.3; // 30% карты - поля
     const hillsProb = params.hillsDensity || 0.15; // 15% - холмы
@@ -73,9 +75,8 @@ export class TerrainGenerator {
     
     // Создаем карту с радиусом radius
     for (let q = -radius; q <= radius; q++) {
-      const r1 = Math.max(-radius, -q - radius);
-      const r2 = Math.min(radius, -q + radius);
-      
+      const { start: r1, end: r2 } = getRowBounds(radius, q, normalizedRows);
+
       for (let r = r1; r <= r2; r++) {
         const s = -q - r; // q + r + s = 0
         
@@ -118,9 +119,10 @@ export class TerrainGenerator {
   }
 
   // Метод 2: Процедурная генерация с использованием шума Симплекса
-  private generateProceduralTerrain(radius: number, params: GeneratorParams): HexData[] {
+  private generateProceduralTerrain(radius: number, params: GeneratorParams, additionalMiddleRows: number = 0): HexData[] {
     const newMap: HexData[] = [];
     const seed = params.seed || 'default';
+    const normalizedRows = normalizeAdditionalMiddleRows(additionalMiddleRows);
     
     // Создаем генератор шума с заданным сидом
     const rng = seedrandom(seed);
@@ -144,9 +146,8 @@ export class TerrainGenerator {
     
     // Создаем карту с радиусом radius
     for (let q = -radius; q <= radius; q++) {
-      const r1 = Math.max(-radius, -q - radius);
-      const r2 = Math.min(radius, -q + radius);
-      
+      const { start: r1, end: r2 } = getRowBounds(radius, q, normalizedRows);
+
       for (let r = r1; r <= r2; r++) {
         const s = -q - r; // q + r + s = 0
         
@@ -202,9 +203,10 @@ export class TerrainGenerator {
   }
 
   // Метод 3: Островная генерация с использованием расстояния от центра
-  generateIslandTerrain(radius: number, params: GeneratorParams = {}): HexData[] {
+  generateIslandTerrain(radius: number, params: GeneratorParams = {}, additionalMiddleRows: number = 0): HexData[] {
     const newMap: HexData[] = [];
     const seed = params.seed || 'default';
+    const normalizedRows = normalizeAdditionalMiddleRows(additionalMiddleRows);
     
     // Создаем генератор шума с заданным сидом
     const rng = seedrandom(seed);
@@ -215,9 +217,8 @@ export class TerrainGenerator {
     const centerInfluence = 0.5; // Сильнее влияние расстояния от центра
     
     for (let q = -radius; q <= radius; q++) {
-      const r1 = Math.max(-radius, -q - radius);
-      const r2 = Math.min(radius, -q + radius);
-      
+      const { start: r1, end: r2 } = getRowBounds(radius, q, normalizedRows);
+
       for (let r = r1; r <= r2; r++) {
         const s = -q - r; // q + r + s = 0
         
@@ -276,9 +277,10 @@ export class TerrainGenerator {
   }
 
   // Метод 4: Генерация с био-регионами
-  generateBiomesTerrain(radius: number, params: GeneratorParams = {}): HexData[] {
+  generateBiomesTerrain(radius: number, params: GeneratorParams = {}, additionalMiddleRows: number = 0): HexData[] {
     const newMap: HexData[] = [];
     const seed = params.seed || 'default';
+    const normalizedRows = normalizeAdditionalMiddleRows(additionalMiddleRows);
     
     // Создаем два генератора шума с разными сидами
     const rng1 = seedrandom(seed);
@@ -291,9 +293,8 @@ export class TerrainGenerator {
     const moistScale = 0.05; // Масштаб для влажности
     
     for (let q = -radius; q <= radius; q++) {
-      const r1 = Math.max(-radius, -q - radius);
-      const r2 = Math.min(radius, -q + radius);
-      
+      const { start: r1, end: r2 } = getRowBounds(radius, q, normalizedRows);
+
       for (let r = r1; r <= r2; r++) {
         const s = -q - r; // q + r + s = 0
         

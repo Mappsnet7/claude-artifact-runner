@@ -10,10 +10,11 @@ interface TerrainGeneratorPanelProps {
   terrainTypes: Array<any>;
   onGenerateTerrain: (hexMap: Array<any>, hexCount: number) => void;
   radius: number;
+  additionalMiddleRows: number;
 }
 
 // Основной компонент генератора ландшафта
-const TerrainGeneratorPanel: React.FC<TerrainGeneratorPanelProps> = ({ terrainTypes, onGenerateTerrain, radius }) => {
+const TerrainGeneratorPanel: React.FC<TerrainGeneratorPanelProps> = ({ terrainTypes, onGenerateTerrain, radius, additionalMiddleRows }) => {
   // Состояния для параметров генератора
   const [generatorType, setGeneratorType] = useState<string>('procedural');
   const [randomSeed, setRandomSeed] = useState<string>('default');
@@ -93,17 +94,17 @@ const TerrainGeneratorPanel: React.FC<TerrainGeneratorPanelProps> = ({ terrainTy
     let newMap;
     switch (generatorType) {
       case 'random':
-        newMap = generator.generateTerrain(radius, params);
+        newMap = generator.generateTerrain(radius, params, additionalMiddleRows);
         break;
       case 'island':
-        newMap = generator.generateIslandTerrain(radius, params);
+        newMap = generator.generateIslandTerrain(radius, params, additionalMiddleRows);
         break;
       case 'biomes':
-        newMap = generator.generateBiomesTerrain(radius, params);
+        newMap = generator.generateBiomesTerrain(radius, params, additionalMiddleRows);
         break;
       case 'procedural':
       default:
-        newMap = generator.generateTerrain(radius, params);
+        newMap = generator.generateTerrain(radius, params, additionalMiddleRows);
         break;
     }
     

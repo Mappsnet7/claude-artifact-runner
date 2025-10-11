@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import TerrainGeneratorPanel from './TerrainGeneratorPanel';
-import { 
+import {
   FaSave, FaUndo, FaTimes, FaUpload, FaCube,
   FaRuler, FaEdit, FaFile, FaEye, FaWater
 } from 'react-icons/fa';
 import { RiMapFill, RiEarthLine } from 'react-icons/ri';
+import { countHexes, getRowBounds, normalizeAdditionalMiddleRows } from './hexUtils';
 
 // Основные типы местности и их цвета
 const terrainTypes = [
@@ -140,6 +141,7 @@ type Vertex = { q: number; r: number; s: number; index: number; x: number; y: nu
 const HexMapEditor = () => {
   // Состояния для размеров карты
   const [mapRadius, setMapRadius] = useState(5);
+  const [middleRowsToAdd, setMiddleRowsToAdd] = useState(0);
   const [showSizeInput, setShowSizeInput] = useState(true);
   const [selectedTerrain, setSelectedTerrain] = useState(terrainTypes[0]);
   const [hexMap, setHexMap] = useState<Array<{q: number; r: number; s: number; terrainType: string; color: string; height: number; unit?: {type: string; icon: string; color: string} }>>([]);
@@ -153,6 +155,15 @@ const HexMapEditor = () => {
   const [showTerrainGenerator, setShowTerrainGenerator] = useState(false);
   const [showUnits, setShowUnits] = useState(true); // Состояние для отображения/скрытия юнитов
   const [maxPlayerUnits, setMaxPlayerUnits] = useState(8); // Максимальное количество шашек игрока
+
+  const normalizedAdditionalRows = useMemo(
+    () => normalizeAdditionalMiddleRows(middleRowsToAdd),
+    [middleRowsToAdd]
+  );
+  const estimatedHexCount = useMemo(
+    () => countHexes(mapRadius, normalizedAdditionalRows),
+    [mapRadius, normalizedAdditionalRows]
+  );
   
   // Состояния для рек
   const [rivers, setRivers] = useState<River[]>([]);
@@ -181,51 +192,6 @@ const HexMapEditor = () => {
   
   // Сохраняем удаленные гексы для возможности восстановления
   const [deletedHexes, setDeletedHexes] = useState<Array<{q: number; r: number; s: number; terrainType: string; color: string; height: number; unit?: {type: string; icon: string; color: string} }>>([]);
-  
-  // Инициализация карты с гексагональной сеткой в кубических координатах 
-  const initializeMap = useCallback(() => {
-    // Если карта уже существует и не пустая, используем resizeMap для сохранения существующих клеток
-    if (hexMap.length > 0) {
-      resizeMap(mapRadius);
-      return;
-    }
-    
-    // Ограничиваем максимальный радиус для производительности
-    const safeRadius = Math.min(mapRadius, 15);
-    if (safeRadius !== mapRadius) {
-      setMapRadius(safeRadius);
-    }
-    
-    const newMap = [];
-    
-    // Создаем гексагональную карту с радиусом mapRadius
-    for (let q = -safeRadius; q <= safeRadius; q++) {
-      const r1 = Math.max(-safeRadius, -q - safeRadius);
-      const r2 = Math.min(safeRadius, -q + safeRadius);
-      
-      for (let r = r1; r <= r2; r++) {
-        const s = -q - r; // q + r + s = 0
-        
-        // Все гексы создаются с типом поля
-        const fieldTerrain = terrainTypes.find(t => t.id === 'field') || terrainTypes[0];
-        
-        newMap.push({
-          q,
-          r,
-          s,
-          terrainType: fieldTerrain.id,
-          color: fieldTerrain.color,
-          height: fieldTerrain.height
-        });
-      }
-    }
-    
-    setHexMap(newMap);
-    setHexCount(newMap.length);
-    setShowSizeInput(false);
-    // Сбрасываем трансформацию при создании новой карты
-    setViewTransform({ scale: 1, x: 0, y: 0 });
-  }, [hexMap.length, mapRadius]);
   
   // Расчет позиции хекса с учетом ориентации в кубических координатах
   const getHexPosition = useCallback((q: number, r: number) => {
@@ -504,9 +470,8 @@ const HexMapEditor = () => {
     // Для создания полных границ карты
     const fullCoordinates = [];
     for (let q = -mapRadius; q <= mapRadius; q++) {
-      const r1 = Math.max(-mapRadius, -q - mapRadius);
-      const r2 = Math.min(mapRadius, -q + mapRadius);
-      
+      const { start: r1, end: r2 } = getRowBounds(mapRadius, q, normalizedAdditionalRows);
+
       for (let r = r1; r <= r2; r++) {
         const s = -q - r; // q + r + s = 0
         fullCoordinates.push({ q, r, s });
@@ -525,6 +490,7 @@ const HexMapEditor = () => {
     const jsonData = JSON.stringify({ 
       hexes: [...cleanedMap, ...emptyCoordinates], 
       mapRadius,
+      additionalMiddleRows: normalizedAdditionalRows,
       maxPlayerUnits,
       rivers: rivers
     }, null, 2);
@@ -874,14 +840,15 @@ const HexMapEditor = () => {
       requestAnimationFrame(addNextBatchOfHexes);
       
       // Добавляем сетку для ориентации
-      const gridHelper = new THREE.GridHelper(mapRadius * 4, mapRadius * 2);
+      const effectiveRadius = mapRadius + normalizedAdditionalRows;
+      const gridHelper = new THREE.GridHelper(effectiveRadius * 4, effectiveRadius * 2);
       gridHelper.position.y = -0.05; // Размещаем сетку чуть ниже уровня местности
       gridHelper.material.opacity = 0.2;
       gridHelper.material.transparent = true;
       scene.add(gridHelper);
-      
+
       // Добавляем небольшую декоративную плоскость под картой
-      const planeGeometry = new THREE.PlaneGeometry(mapRadius * 6, mapRadius * 6);
+      const planeGeometry = new THREE.PlaneGeometry(effectiveRadius * 6, effectiveRadius * 6);
       const planeMaterial = new THREE.MeshStandardMaterial({ 
         color: 0x336699, 
         metalness: 0.1,
@@ -938,7 +905,7 @@ const HexMapEditor = () => {
         }
       };
     }
-  }, [show3DPreview, hexMap, mapRadius, orientation, showUnits]);
+  }, [show3DPreview, hexMap, mapRadius, orientation, showUnits, normalizedAdditionalRows]);
   
   // Обновляем видимые гексы при изменении масштаба или позиции просмотра
   useEffect(() => {
@@ -1119,14 +1086,16 @@ const HexMapEditor = () => {
   const svgDimensions = hexMap.length > 0 ? calculateSvgDimensions() : { width: 100, height: 100, viewBox: "0 0 100 100" };
 
   // Функции для изменения размера карты с сохранением существующих клеток
-  const resizeMap = useCallback((newRadius: number) => {
+  const resizeMap = useCallback((newRadius: number, additionalRowsOverride?: number) => {
     // Ограничиваем максимальный радиус для производительности
     const safeRadius = Math.min(newRadius, 15);
     if (safeRadius !== newRadius) {
       setMapRadius(safeRadius);
       newRadius = safeRadius;
     }
-    
+
+    const rowsToUse = additionalRowsOverride ?? normalizedAdditionalRows;
+
     // Сохраняем текущую карту в виде объекта для быстрого доступа
     const currentHexes: Record<string, {q: number; r: number; s: number; terrainType: string; color: string; height: number; unit?: {type: string; icon: string; color: string} }> = {};
     hexMap.forEach(hex => {
@@ -1138,16 +1107,15 @@ const HexMapEditor = () => {
     setTimeout(() => {
       const newMap: Array<{q: number; r: number; s: number; terrainType: string; color: string; height: number; unit?: {type: string; icon: string; color: string} }> = [];
       const fieldTerrain = terrainTypes.find(t => t.id === 'field') || terrainTypes[0];
-      
+
       // Создаем новую карту с новым радиусом
       for (let q = -newRadius; q <= newRadius; q++) {
-        const r1 = Math.max(-newRadius, -q - newRadius);
-        const r2 = Math.min(newRadius, -q + newRadius);
-        
+        const { start: r1, end: r2 } = getRowBounds(newRadius, q, rowsToUse);
+
         for (let r = r1; r <= r2; r++) {
           const s = -q - r; // q + r + s = 0
           const key = `${q},${r},${s}`;
-          
+
           // Если гекс существовал ранее, сохраняем его свойства
           if (currentHexes[key]) {
             newMap.push(currentHexes[key]);
@@ -1167,12 +1135,12 @@ const HexMapEditor = () => {
       
       // Подсчитываем количество видимых (не пустых) гексов
       const visibleHexCount = newMap.filter(hex => hex.terrainType !== 'empty').length;
-      
+
       setHexMap(newMap);
       setHexCount(visibleHexCount);
       setMapRadius(newRadius);
     }, 0);
-  }, [hexMap, terrainTypes]);
+  }, [hexMap, terrainTypes, normalizedAdditionalRows]);
 
   const increaseRadius = useCallback(() => {
     // Ограничиваем максимальный радиус
@@ -1184,6 +1152,66 @@ const HexMapEditor = () => {
     if (mapRadius <= 1) return;
     resizeMap(mapRadius - 1);
   }, [mapRadius, resizeMap]);
+
+  const handleMiddleRowsChange = useCallback((value: number) => {
+    const numericValue = Math.max(0, Math.min(Math.floor(value), mapRadius));
+    setMiddleRowsToAdd(numericValue);
+
+    if (!showSizeInput && hexMap.length > 0) {
+      const normalizedValue = normalizeAdditionalMiddleRows(numericValue);
+      resizeMap(mapRadius, normalizedValue);
+    }
+  }, [hexMap.length, mapRadius, resizeMap, showSizeInput]);
+
+  useEffect(() => {
+    if (middleRowsToAdd > mapRadius) {
+      handleMiddleRowsChange(mapRadius);
+    }
+  }, [handleMiddleRowsChange, mapRadius, middleRowsToAdd]);
+
+  // Инициализация карты с гексагональной сеткой в кубических координатах
+  const initializeMap = useCallback(() => {
+    // Если карта уже существует и не пустая, используем resizeMap для сохранения существующих клеток
+    if (hexMap.length > 0) {
+      resizeMap(mapRadius);
+      return;
+    }
+
+    // Ограничиваем максимальный радиус для производительности
+    const safeRadius = Math.min(mapRadius, 15);
+    if (safeRadius !== mapRadius) {
+      setMapRadius(safeRadius);
+    }
+
+    const newMap = [];
+
+    // Создаем гексагональную карту с радиусом mapRadius
+    for (let q = -safeRadius; q <= safeRadius; q++) {
+      const { start: r1, end: r2 } = getRowBounds(safeRadius, q, normalizedAdditionalRows);
+
+      for (let r = r1; r <= r2; r++) {
+        const s = -q - r; // q + r + s = 0
+
+        // Все гексы создаются с типом поля
+        const fieldTerrain = terrainTypes.find(t => t.id === 'field') || terrainTypes[0];
+
+        newMap.push({
+          q,
+          r,
+          s,
+          terrainType: fieldTerrain.id,
+          color: fieldTerrain.color,
+          height: fieldTerrain.height
+        });
+      }
+    }
+
+    setHexMap(newMap);
+    setHexCount(newMap.length);
+    setShowSizeInput(false);
+    // Сбрасываем трансформацию при создании новой карты
+    setViewTransform({ scale: 1, x: 0, y: 0 });
+  }, [hexMap.length, mapRadius, normalizedAdditionalRows, terrainTypes, resizeMap]);
 
   // Функция для загрузки карты из JSON
   const importFromJSON = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1216,16 +1244,16 @@ const HexMapEditor = () => {
         const fieldTerrain = terrainTypes.find(t => t.id === 'field') || terrainTypes[0];
         const radius = jsonData.mapRadius;
         const importedMaxPlayerUnits = typeof jsonData.maxPlayerUnits === 'number' ? jsonData.maxPlayerUnits : 8; // Значение по умолчанию, если отсутствует
+        const additionalRowsFromJson = normalizeAdditionalMiddleRows(jsonData.additionalMiddleRows ?? 0);
         const fullMap: Array<{q: number; r: number; s: number; terrainType: string; color: string; height: number; unit?: {type: string; icon: string; color: string} }> = [];
-        
+
         // Создаем базовую карту с полями
         for (let q = -radius; q <= radius; q++) {
-          const r1 = Math.max(-radius, -q - radius);
-          const r2 = Math.min(radius, -q + radius);
-          
+          const { start: r1, end: r2 } = getRowBounds(radius, q, additionalRowsFromJson);
+
           for (let r = r1; r <= r2; r++) {
             const s = -q - r; // q + r + s = 0
-            
+
             fullMap.push({
               q,
               r,
@@ -1281,6 +1309,7 @@ const HexMapEditor = () => {
         
         // Обновляем состояние карты
         setMapRadius(radius);
+        setMiddleRowsToAdd(additionalRowsFromJson);
         setHexMap(fullMap);
         setHexCount(visibleHexCount);
         setShowSizeInput(false);
@@ -1641,6 +1670,17 @@ const HexMapEditor = () => {
               />
             </div>
             <div className="flex items-center">
+              <label className="w-32 text-gray-700">Ряды в центре:</label>
+              <input
+                type="number"
+                value={middleRowsToAdd}
+                onChange={(e) => handleMiddleRowsChange(parseInt(e.target.value) || 0)}
+                className="border rounded px-3 py-2 w-24 text-center"
+                min="0"
+                max={mapRadius}
+              />
+            </div>
+            <div className="flex items-center">
               <label className="w-32 text-gray-700">Макс. шашек игрока:</label>
               <input
                 type="number"
@@ -1651,7 +1691,7 @@ const HexMapEditor = () => {
               />
             </div>
             <div className="text-sm text-gray-600 ml-32">
-              Примерное количество гексов: {3 * mapRadius * (mapRadius + 1) + 1}
+              Примерное количество гексов: {estimatedHexCount}
             </div>
             <div className="flex items-center">
               <label className="w-32 text-gray-700">Ориентация:</label>
@@ -1703,6 +1743,15 @@ const HexMapEditor = () => {
                     onChange={(e) => setMaxPlayerUnits(parseInt(e.target.value) || 0)}
                     className="border rounded px-2 py-1 w-16 text-center mr-4"
                     min="0"
+                  />
+                  <label className="text-gray-700 mr-2">Ряды в центре:</label>
+                  <input
+                    type="number"
+                    value={middleRowsToAdd}
+                    onChange={(e) => handleMiddleRowsChange(parseInt(e.target.value) || 0)}
+                    className="border rounded px-2 py-1 w-16 text-center mr-4"
+                    min="0"
+                    max={mapRadius}
                   />
                   <label className="text-gray-700">Ориентация:</label>
                   <select
@@ -2260,6 +2309,7 @@ const HexMapEditor = () => {
           terrainTypes={terrainTypes}
           onGenerateTerrain={handleGeneratedTerrain}
           radius={mapRadius}
+          additionalMiddleRows={middleRowsToAdd}
         />
       )}
     </div>
