@@ -1,6 +1,6 @@
 import { createNoise2D } from 'simplex-noise';
 import seedrandom from 'seedrandom';
-import { getRowBounds, normalizeAdditionalMiddleRows } from './hexUtils';
+import { getQRange, getRowBounds, normalizeAdditionalMiddleRows } from './hexUtils';
 
 // Определяем типы для хекса и типы ландшафта
 export type HexData = {
@@ -74,7 +74,8 @@ export class TerrainGenerator {
     const waterProb = params.waterLevel || 0.15; // 15% - вода
     
     // Создаем карту с радиусом radius
-    for (let q = -radius; q <= radius; q++) {
+    const { minQ, maxQ } = getQRange(radius, normalizedRows);
+    for (let q = minQ; q <= maxQ; q++) {
       const { start: r1, end: r2 } = getRowBounds(radius, q, normalizedRows);
 
       for (let r = r1; r <= r2; r++) {
@@ -145,7 +146,8 @@ export class TerrainGenerator {
     };
     
     // Создаем карту с радиусом radius
-    for (let q = -radius; q <= radius; q++) {
+    const { minQ, maxQ } = getQRange(radius, normalizedRows);
+    for (let q = minQ; q <= maxQ; q++) {
       const { start: r1, end: r2 } = getRowBounds(radius, q, normalizedRows);
 
       for (let r = r1; r <= r2; r++) {

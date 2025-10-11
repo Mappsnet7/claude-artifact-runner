@@ -7,7 +7,13 @@ import {
   FaRuler, FaEdit, FaFile, FaEye, FaWater
 } from 'react-icons/fa';
 import { RiMapFill, RiEarthLine } from 'react-icons/ri';
-import { countHexes, getRowBounds, normalizeAdditionalMiddleRows } from './hexUtils';
+import {
+  countHexes,
+  getLogicalPositionKey,
+  getQRange,
+  getRowBounds,
+  normalizeAdditionalMiddleRows
+} from './hexUtils';
 
 // Основные типы местности и их цвета
 const terrainTypes = [
@@ -469,7 +475,8 @@ const HexMapEditor = () => {
     // Для полноты карты добавляем информацию о пустых клетках
     // Для создания полных границ карты
     const fullCoordinates = [];
-    for (let q = -mapRadius; q <= mapRadius; q++) {
+    const { minQ, maxQ } = getQRange(mapRadius, normalizedAdditionalRows);
+    for (let q = minQ; q <= maxQ; q++) {
       const { start: r1, end: r2 } = getRowBounds(mapRadius, q, normalizedAdditionalRows);
 
       for (let r = r1; r <= r2; r++) {
@@ -1094,45 +1101,53 @@ const HexMapEditor = () => {
       newRadius = safeRadius;
     }
 
-    const rowsToUse = additionalRowsOverride ?? normalizedAdditionalRows;
+    const targetAdditionalRows = normalizeAdditionalMiddleRows(
+      additionalRowsOverride ?? normalizedAdditionalRows
+    );
+    const currentRows = normalizedAdditionalRows;
 
-    // Сохраняем текущую карту в виде объекта для быстрого доступа
-    const currentHexes: Record<string, {q: number; r: number; s: number; terrainType: string; color: string; height: number; unit?: {type: string; icon: string; color: string} }> = {};
+    // Сохраняем текущие гексы по логическим позициям для быстрого доступа
+    const currentHexesByKey = new Map<
+      string,
+      { q: number; r: number; s: number; terrainType: string; color: string; height: number; unit?: { type: string; icon: string; color: string } }
+    >();
     hexMap.forEach(hex => {
-      const key = `${hex.q},${hex.r},${hex.s}`;
-      currentHexes[key] = hex;
+      const logicalKey = getLogicalPositionKey(hex.q, hex.r, currentRows);
+      currentHexesByKey.set(logicalKey, hex);
     });
-    
+
     // Используем setTimeout для предотвращения блокировки интерфейса
     setTimeout(() => {
       const newMap: Array<{q: number; r: number; s: number; terrainType: string; color: string; height: number; unit?: {type: string; icon: string; color: string} }> = [];
       const fieldTerrain = terrainTypes.find(t => t.id === 'field') || terrainTypes[0];
 
       // Создаем новую карту с новым радиусом
-      for (let q = -newRadius; q <= newRadius; q++) {
-        const { start: r1, end: r2 } = getRowBounds(newRadius, q, rowsToUse);
+      const { minQ, maxQ } = getQRange(newRadius, targetAdditionalRows);
+      for (let q = minQ; q <= maxQ; q++) {
+        const { start: r1, end: r2 } = getRowBounds(newRadius, q, targetAdditionalRows);
 
         for (let r = r1; r <= r2; r++) {
           const s = -q - r; // q + r + s = 0
-          const key = `${q},${r},${s}`;
+          const logicalKey = getLogicalPositionKey(q, r, targetAdditionalRows);
+          const existingHex = currentHexesByKey.get(logicalKey);
 
-          // Если гекс существовал ранее, сохраняем его свойства
-          if (currentHexes[key]) {
-            newMap.push(currentHexes[key]);
-          } else {
-            // Для новых гексов всегда используем тип "поле"
-            newMap.push({
-              q,
-              r,
-              s,
-              terrainType: fieldTerrain.id,
-              color: fieldTerrain.color,
-              height: fieldTerrain.height
-            });
+          if (existingHex) {
+            newMap.push({ ...existingHex, q, r, s });
+            continue;
           }
+
+          // Для новых гексов всегда используем тип "поле"
+          newMap.push({
+            q,
+            r,
+            s,
+            terrainType: fieldTerrain.id,
+            color: fieldTerrain.color,
+            height: fieldTerrain.height
+          });
         }
       }
-      
+
       // Подсчитываем количество видимых (не пустых) гексов
       const visibleHexCount = newMap.filter(hex => hex.terrainType !== 'empty').length;
 
@@ -1186,7 +1201,8 @@ const HexMapEditor = () => {
     const newMap = [];
 
     // Создаем гексагональную карту с радиусом mapRadius
-    for (let q = -safeRadius; q <= safeRadius; q++) {
+    const { minQ, maxQ } = getQRange(safeRadius, normalizedAdditionalRows);
+    for (let q = minQ; q <= maxQ; q++) {
       const { start: r1, end: r2 } = getRowBounds(safeRadius, q, normalizedAdditionalRows);
 
       for (let r = r1; r <= r2; r++) {
@@ -1248,7 +1264,8 @@ const HexMapEditor = () => {
         const fullMap: Array<{q: number; r: number; s: number; terrainType: string; color: string; height: number; unit?: {type: string; icon: string; color: string} }> = [];
 
         // Создаем базовую карту с полями
-        for (let q = -radius; q <= radius; q++) {
+        const { minQ, maxQ } = getQRange(radius, additionalRowsFromJson);
+        for (let q = minQ; q <= maxQ; q++) {
           const { start: r1, end: r2 } = getRowBounds(radius, q, additionalRowsFromJson);
 
           for (let r = r1; r <= r2; r++) {
