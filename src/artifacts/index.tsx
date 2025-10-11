@@ -153,7 +153,6 @@ const HexMapEditor = () => {
   const [hexMap, setHexMap] = useState<Array<{q: number; r: number; s: number; terrainType: string; color: string; height: number; unit?: {type: string; icon: string; color: string} }>>([]);
   const [show3DPreview, setShow3DPreview] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [orientation, setOrientation] = useState<'flat' | 'pointy'>('flat');
   const [hexCount, setHexCount] = useState(0);
   const [editMode, setEditMode] = useState<'terrain' | 'units' | 'manage' | 'rivers'>('terrain');
   const [manageAction, setManageAction] = useState<'add' | 'delete'>('add');
@@ -202,18 +201,10 @@ const HexMapEditor = () => {
   // Расчет позиции хекса с учетом ориентации в кубических координатах
   const getHexPosition = useCallback((q: number, r: number) => {
     const size = 20;
-    if (orientation === 'flat') {
-      // Плоской стороной вверх (flat-top)
-      const x = size * (3/2 * q);
-      const y = size * Math.sqrt(3) * (r + q/2);
-      return { x, y };
-    } else {
-      // Острым углом вверх (pointy-top)
-      const x = size * Math.sqrt(3) * (q + r/2);
-      const y = size * (3/2 * r);
-      return { x, y };
-    }
-  }, [orientation]);
+    const x = size * (3 / 2 * q);
+    const y = size * Math.sqrt(3) * (r + q / 2);
+    return { x, y };
+  }, []);
   
   // Функция для получения вершин гекса
   const getHexVertices = useCallback((hex: { q: number; r: number; s: number }) => {
@@ -221,15 +212,15 @@ const HexMapEditor = () => {
     const size = 20;
     const vertices: Point[] = [];
     for (let i = 0; i < 6; i++) {
-      // Правильный расчет углов для вершин гекса
-      const angle = (Math.PI / 3) * i + (orientation === 'pointy' ? Math.PI / 6 : 0);
+      // Плоской стороной вверх (flat-top)
+      const angle = (Math.PI / 3) * i;
       vertices.push({
         x: x + size * Math.cos(angle),
         y: y + size * Math.sin(angle),
       });
     }
     return vertices;
-  }, [getHexPosition, orientation]);
+  }, [getHexPosition]);
 
   useEffect(() => {
     if (editMode === 'rivers') {
@@ -738,7 +729,7 @@ const HexMapEditor = () => {
           
           // Создаем шестиугольник
           for (let j = 0; j < 6; j++) {
-            const angle = (Math.PI / 3) * j + (orientation === 'pointy' ? Math.PI / 6 : 0);
+            const angle = (Math.PI / 3) * j;
             const x = radius * Math.cos(angle);
             const y = radius * Math.sin(angle);
             if (j === 0) {
@@ -774,17 +765,10 @@ const HexMapEditor = () => {
           hexMesh.receiveShadow = true;
           
           // Позиционируем хексы в 3D-просмотре с использованием кубических координат
-          if (orientation === 'flat') {
-            const x = 1.5 * hex.q;
-            const z = Math.sqrt(3) * (hex.r + hex.q/2);
-            hexMesh.position.x = x;
-            hexMesh.position.z = z;
-          } else {
-            const x = Math.sqrt(3) * (hex.q + hex.r/2);
-            const z = 1.5 * hex.r;
-            hexMesh.position.x = x;
-            hexMesh.position.z = z;
-          }
+          const x = 1.5 * hex.q;
+          const z = Math.sqrt(3) * (hex.r + hex.q / 2);
+          hexMesh.position.x = x;
+          hexMesh.position.z = z;
           
           // Устанавливаем высоту (Y в Three.js)
           hexMesh.position.y = 0;
@@ -912,7 +896,7 @@ const HexMapEditor = () => {
         }
       };
     }
-  }, [show3DPreview, hexMap, mapRadius, orientation, showUnits, normalizedAdditionalRows]);
+  }, [show3DPreview, hexMap, mapRadius, showUnits, normalizedAdditionalRows]);
   
   // Обновляем видимые гексы при изменении масштаба или позиции просмотра
   useEffect(() => {
@@ -975,9 +959,8 @@ const HexMapEditor = () => {
     const points = [];
     
     for (let i = 0; i < 6; i++) {
-      // Для flat-top начинаем с угла 0 градусов (0)
-      // Для pointy-top начинаем с угла 30 градусов (PI/6)
-      const angle = (Math.PI / 3) * i + (orientation === 'pointy' ? Math.PI / 6 : 0);
+      // Плоской стороной вверх (flat-top)
+      const angle = (Math.PI / 3) * i;
       const point_x = x + size * Math.cos(angle);
       const point_y = y + size * Math.sin(angle);
       points.push(`${point_x},${point_y}`);
@@ -1069,7 +1052,7 @@ const HexMapEditor = () => {
       
       // Вычисляем крайние точки хекса
       for (let i = 0; i < 6; i++) {
-        const angle = (Math.PI / 3) * i + (orientation === 'pointy' ? Math.PI / 6 : 0);
+        const angle = (Math.PI / 3) * i;
         const pointX = x + size * Math.cos(angle);
         const pointY = y + size * Math.sin(angle);
         
@@ -1394,7 +1377,7 @@ const HexMapEditor = () => {
       const points = [];
       
       for (let i = 0; i < 6; i++) {
-        const angle = (Math.PI / 3) * i + (orientation === 'pointy' ? Math.PI / 6 : 0);
+        const angle = (Math.PI / 3) * i;
         const point_x = x + size * Math.cos(angle);
         const point_y = y + size * Math.sin(angle);
         points.push(`${point_x},${point_y}`);
@@ -1710,17 +1693,6 @@ const HexMapEditor = () => {
             <div className="text-sm text-gray-600 ml-32">
               Примерное количество гексов: {estimatedHexCount}
             </div>
-            <div className="flex items-center">
-              <label className="w-32 text-gray-700">Ориентация:</label>
-              <select
-                value={orientation}
-                onChange={(e) => setOrientation(e.target.value as 'flat' | 'pointy')}
-                className="border rounded px-3 py-2"
-              >
-                <option value="flat">Плоской стороной вверх</option>
-                <option value="pointy">Острым углом вверх</option>
-              </select>
-            </div>
             <div className="flex gap-2">
               <button
                 onClick={initializeMap}
@@ -1770,15 +1742,6 @@ const HexMapEditor = () => {
                     min="0"
                     max={mapRadius}
                   />
-                  <label className="text-gray-700">Ориентация:</label>
-                  <select
-                    value={orientation}
-                    onChange={(e) => setOrientation(e.target.value as 'flat' | 'pointy')}
-                    className="border rounded px-2 py-1"
-                  >
-                    <option value="flat">Плоской стороной вверх</option>
-                    <option value="pointy">Острым углом вверх</option>
-                  </select>
                 </div>
               </div>
               
