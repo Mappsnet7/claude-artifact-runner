@@ -1,25 +1,6 @@
 import { createNoise2D } from 'simplex-noise';
 import seedrandom from 'seedrandom';
-
-// Определяем типы для хекса и типы ландшафта
-export type HexData = {
-  q: number;
-  r: number;
-  s: number;
-  terrainType: string;
-  color: string;
-  height: number;
-  unit?: { type: string; icon: string; color: string };
-};
-
-export type TerrainType = {
-  id: string;
-  name: string;
-  color: string;
-  height: number;
-  pattern?: any;
-  isEmpty?: boolean;
-};
+import type { HexData, TerrainType } from './types';
 
 // Интерфейсы для параметров генераторов
 export interface GeneratorParams {
