@@ -83,7 +83,7 @@ const HexMapEditor = () => {
   const [isDrawing, setIsDrawing] = useState(false);
   const [visibleHexes, setVisibleHexes] = useState<HexData[]>([]);
 
-  const UNIT_SCALE = 2.0;
+  const UNIT_SCALE = 1.2;
 
   const svgContainer = useRef<HTMLDivElement>(null);
   const svgElement = useRef<SVGSVGElement>(null);
