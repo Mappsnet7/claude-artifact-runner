@@ -6,7 +6,7 @@ export interface ImportedMapData {
   maxPlayerUnits?: number
 }
 
-export function exportMapToJSON(hexMap: HexData[], mapRadius: number): void {
+export function exportMapToJSON(hexMap: HexData[], mapRadius: number, maxPlayerUnits?: number): void {
   const cleanedMap = hexMap.map(hex => {
     const basicHex: {
       position: { q: number; r: number; s: number }
@@ -22,7 +22,7 @@ export function exportMapToJSON(hexMap: HexData[], mapRadius: number): void {
     return basicHex
   })
 
-  const jsonData = JSON.stringify({ hexes: cleanedMap, mapRadius }, null, 2)
+  const jsonData = JSON.stringify({ hexes: cleanedMap, mapRadius, maxPlayerUnits }, null, 2)
   const dataStr = 'data:text/json;charset=utf-8,' + encodeURIComponent(jsonData)
   const a = document.createElement('a')
   a.setAttribute('href', dataStr)
@@ -58,7 +58,7 @@ export function importMapFromJSON(
         const r2 = Math.min(radius, -q + radius)
         for (let r = r1; r <= r2; r++) {
           const s = -q - r
-          hexMap.push({ q, r, s, terrainType: 'field', color: '#90c060', height: 0.1 })
+          hexMap.push({ q, r, s, terrainType: 'field', color: '#4CAF50', height: 0 })
         }
       }
 
@@ -79,9 +79,9 @@ export function importMapFromJSON(
           hexMap[idx] = {
             ...hexMap[idx],
             terrainType: hexEntry.terrainType,
-            // color and height will be resolved by consumer using terrainTypes
           }
           if (hexEntry.unit?.type) {
+            // icon and color resolved by consumer (useHexMap) which has access to unitTypes
             hexMap[idx].unit = { type: hexEntry.unit.type, icon: '', color: '' }
           }
         }

@@ -144,20 +144,33 @@ export function useHexMap(): UseHexMapReturn {
   }, [hexMap, deletedHexes])
 
   const exportToJSON = useCallback(() => {
-    exportMapToJSON(hexMap, mapRadius)
-  }, [hexMap, mapRadius])
+    exportMapToJSON(hexMap, mapRadius, maxPlayerUnits)
+  }, [hexMap, mapRadius, maxPlayerUnits])
 
   const importFromJSON = useCallback(
     (file: File, onViewReset?: () => void) => {
       importMapFromJSON(file, (data) => {
-        setHexMap(data.hexMap)
+        // Resolve color/height from terrainTypes and icon/color from unitTypes
+        const resolvedMap: HexData[] = data.hexMap.map(hex => {
+          const terrain = terrainTypes.find(t => t.id === hex.terrainType) ?? terrainTypes.find(t => t.id === 'field') ?? terrainTypes[0]
+          const resolved: HexData = { ...hex, color: terrain.color, height: terrain.height }
+          if (hex.unit?.type) {
+            const unitDef = unitTypes.find(u => u.id === hex.unit!.type)
+            resolved.unit = unitDef
+              ? { type: unitDef.id, icon: unitDef.icon, color: unitDef.color }
+              : hex.unit
+          }
+          return resolved
+        })
+        setHexMap(resolvedMap)
         setMapRadius(data.mapRadius)
-        setHexCount(data.hexMap.filter((h: HexData) => h.terrainType !== 'empty').length)
+        if (data.maxPlayerUnits !== undefined) setMaxPlayerUnits(data.maxPlayerUnits)
+        setHexCount(resolvedMap.filter(h => h.terrainType !== 'empty').length)
         setShowSizeInput(false)
         onViewReset?.()
       })
     },
-    []
+    [terrainTypes, unitTypes]
   )
 
   const applyTerrain = useCallback(
