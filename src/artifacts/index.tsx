@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import TerrainGeneratorPanel from './TerrainGeneratorPanel';
 import {
   FaSave, FaUndo, FaTimes, FaUpload, FaCube,
-  FaRuler, FaEdit, FaFile, FaEye
+  FaRuler, FaEdit, FaFile, FaEye, FaPlus, FaMinus, FaTrash
 } from 'react-icons/fa';
 import { RiMapFill, RiEarthLine } from 'react-icons/ri';
 import type { HexData, TerrainType, UnitType, EditMode, ViewTransform } from './types';
@@ -266,7 +266,7 @@ const HexMapEditor = () => {
         key={`hex-${hex.q},${hex.r},${hex.s}`}
         points={points}
         fill={fillValue}
-        stroke="#333"
+        stroke="#1a1f1c"
         strokeWidth="1"
         style={{ cursor: cursorStyle }}
         onMouseDown={e => {
@@ -317,14 +317,14 @@ const HexMapEditor = () => {
               id={`potentialHexPattern-${hex.q}-${hex.r}-${hex.s}`}
               patternUnits="userSpaceOnUse" width="10" height="10"
             >
-              <rect width="10" height="10" fill="white" fillOpacity="0.1" />
-              <path d="M0,0 L10,10 M-5,5 L5,-5 M5,15 L15,5" stroke="#aaa" strokeWidth="1" />
+              <rect width="10" height="10" fill="white" fillOpacity="0.05" />
+              <path d="M0,0 L10,10 M-5,5 L5,-5 M5,15 L15,5" stroke="#3a4540" strokeWidth="0.5" />
             </pattern>
           </defs>
           <polygon
             points={points}
             fill={`url(#potentialHexPattern-${hex.q}-${hex.r}-${hex.s})`}
-            stroke="#aaa" strokeWidth="1" strokeDasharray="4,2"
+            stroke="#3a4540" strokeWidth="1" strokeDasharray="4,2"
             style={{ cursor: 'crosshair' }}
             onClick={() => handleHexClick(hex)}
           />
@@ -333,272 +333,327 @@ const HexMapEditor = () => {
     });
   };
 
+  // ── Mode tab button helper ────────────────────────────────────────────────
+  const ModeTab = ({ mode, label, icon }: { mode: EditMode; label: string; icon: React.ReactNode }) => (
+    <button
+      onClick={() => setEditMode(mode)}
+      className={`ech-btn ${editMode === mode ? 'ech-btn-active' : ''}`}
+    >
+      {icon} {label}
+    </button>
+  );
+
   // ── JSX ───────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col items-center w-full max-w-6xl mx-auto p-4 bg-gray-800 rounded-lg shadow-lg">
-      <h1 className="text-2xl font-bold mb-4 text-white flex items-center">
-        <RiMapFill className="mr-2 text-yellow-400" />
-        Редактор Гексагональных Карт
-      </h1>
+    <div className="flex flex-col h-screen overflow-hidden" style={{ background: 'var(--echelon-bg)' }}>
+      {/* ── TOP BAR ──────────────────────────────────────────────────── */}
+      <header className="flex items-center justify-between px-4 h-11 flex-shrink-0"
+        style={{ background: 'var(--echelon-surface)', borderBottom: '1px solid var(--echelon-border)' }}>
+        <div className="flex items-center gap-3">
+          <h1 className="text-base font-bold tracking-wider flex items-center gap-2" style={{ fontFamily: "'Rajdhani', sans-serif", color: 'var(--echelon-amber)' }}>
+            <RiMapFill /> ECHELON
+          </h1>
+          <span className="text-xs" style={{ color: 'var(--echelon-text-muted)' }}>Map Editor</span>
+        </div>
+
+        {!showSizeInput && (
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <span className="ech-label">Радиус</span>
+              <span className="ech-stat">{mapRadius}</span>
+              <span className="ech-label">Гексы</span>
+              <span className="ech-stat">{hexCount}</span>
+              <span className="ech-label">Макс. шашек</span>
+              <input
+                type="number" value={maxPlayerUnits}
+                onChange={e => setMaxPlayerUnits(parseInt(e.target.value) || 0)}
+                className="ech-input w-14 text-center" min="0"
+              />
+            </div>
+
+            <div style={{ width: 1, height: 20, background: 'var(--echelon-border)' }} />
+
+            <div className="flex items-center gap-1">
+              <label className="ech-btn" style={{ cursor: 'pointer' }}>
+                <FaUpload size={11} /> Загрузить
+                <input type="file" accept=".json" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) importFromJSON(f, resetView); }} />
+              </label>
+              <button onClick={exportToJSON} className="ech-btn ech-btn-green">
+                <FaSave size={11} /> Экспорт
+              </button>
+            </div>
+          </div>
+        )}
+      </header>
 
       {showSizeInput ? (
-        <div className="mb-6 p-6 bg-white rounded-lg shadow-md w-full max-w-md">
-          <h2 className="text-xl font-semibold mb-4">
-            {hexMap.length > 0 ? 'Изменение размера карты' : 'Определите размер карты'}
-          </h2>
-          <div className="flex flex-col space-y-4">
-            <div className="flex items-center">
-              <label className="w-32 text-gray-700">Радиус карты:</label>
-              <input type="number" value={mapRadius}
-                onChange={e => { const v = parseInt(e.target.value) || 1; resizeMap(v); }}
-                className="border rounded px-3 py-2 w-24 text-center" min="1" max="20" />
-            </div>
-            <div className="flex items-center">
-              <label className="w-32 text-gray-700">Макс. шашек игрока:</label>
-              <input type="number" value={maxPlayerUnits}
-                onChange={e => setMaxPlayerUnits(parseInt(e.target.value) || 0)}
-                className="border rounded px-3 py-2 w-24 text-center" min="0" />
-            </div>
-            <div className="text-sm text-gray-600 ml-32">
-              Примерное количество гексов: {3 * mapRadius * (mapRadius + 1) + 1}
-            </div>
-            <div className="flex gap-2">
-              <button onClick={() => initializeMap(resetView)}
-                className="mt-4 bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                {hexMap.length > 0 ? 'Изменить размер' : 'Создать пустую карту'}
-              </button>
-              <button onClick={() => setShowTerrainGenerator(true)}
-                className="mt-4 bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">
-                Сгенерировать ландшафт
-              </button>
+        /* ── MAP SETUP SCREEN ────────────────────────────────────────── */
+        <div className="flex-1 flex items-center justify-center">
+          <div className="ech-panel p-8 w-full max-w-md">
+            <h2 className="text-xl font-bold mb-6" style={{ color: 'var(--echelon-amber)', fontFamily: "'Rajdhani', sans-serif" }}>
+              {hexMap.length > 0 ? 'Изменение размера карты' : 'Новая карта'}
+            </h2>
+            <div className="flex flex-col gap-4">
+              <div className="flex items-center gap-3">
+                <label className="ech-label w-36">Радиус карты</label>
+                <input type="number" value={mapRadius}
+                  onChange={e => { const v = parseInt(e.target.value) || 1; resizeMap(v); }}
+                  className="ech-input w-20 text-center" min="1" max="20" />
+              </div>
+              <div className="flex items-center gap-3">
+                <label className="ech-label w-36">Макс. шашек игрока</label>
+                <input type="number" value={maxPlayerUnits}
+                  onChange={e => setMaxPlayerUnits(parseInt(e.target.value) || 0)}
+                  className="ech-input w-20 text-center" min="0" />
+              </div>
+              <div className="ech-stat ml-[9.5rem]">
+                ~ {3 * mapRadius * (mapRadius + 1) + 1} гексов
+              </div>
+              <hr className="ech-divider" />
+              <div className="flex gap-2">
+                <button onClick={() => initializeMap(resetView)} className="ech-btn ech-btn-amber flex-1">
+                  {hexMap.length > 0 ? 'Изменить размер' : 'Создать пустую карту'}
+                </button>
+                <button onClick={() => setShowTerrainGenerator(true)} className="ech-btn ech-btn-green flex-1">
+                  <RiEarthLine /> Генератор
+                </button>
+              </div>
             </div>
           </div>
         </div>
       ) : (
-        <div className="w-full">
-          <div className="mb-4 p-4 bg-white rounded-lg shadow-md">
-            <div className="flex flex-col space-y-4">
-              <div className="flex justify-between items-center">
-                <h2 className="text-lg font-semibold">Режим редактирования</h2>
-                <div className="flex items-center space-x-2">
-                  <label className="text-gray-700 mr-4">
-                    <input type="checkbox" checked={showUnits} onChange={() => setShowUnits(v => !v)} className="mr-1" />
-                    Показать юниты
-                  </label>
-                  <label className="text-gray-700 mr-2">Макс. шашек игрока:</label>
-                  <input type="number" value={maxPlayerUnits}
-                    onChange={e => setMaxPlayerUnits(parseInt(e.target.value) || 0)}
-                    className="border rounded px-2 py-1 w-16 text-center mr-4" min="0" />
-                </div>
-              </div>
+        /* ── MAIN EDITOR LAYOUT ──────────────────────────────────────── */
+        <div className="flex flex-1 overflow-hidden">
+          {/* ── LEFT SIDEBAR ── */}
+          <aside className="w-64 flex-shrink-0 flex flex-col overflow-y-auto"
+            style={{ background: 'var(--echelon-surface)', borderRight: '1px solid var(--echelon-border)' }}>
 
-              <div className="flex flex-wrap gap-2">
-                <button onClick={() => setEditMode('terrain')}
-                  className={`px-3 py-2 rounded-md ${editMode === 'terrain' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>
-                  Редактор местности
-                </button>
-                <button onClick={() => setEditMode('units')}
-                  className={`px-3 py-2 rounded-md ${editMode === 'units' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>
-                  Расстановка шашек
-                </button>
-                <button onClick={() => setEditMode('manage')}
-                  className={`px-3 py-2 rounded-md ${editMode === 'manage' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}>
-                  Управление гексами
-                </button>
-              </div>
+            {/* Mode Tabs */}
+            <div className="p-3 flex flex-col gap-1">
+              <span className="ech-label mb-1">Режим</span>
+              <ModeTab mode="terrain" label="Местность" icon={<RiMapFill size={13} />} />
+              <ModeTab mode="units" label="Шашки" icon={<FaEdit size={11} />} />
+              <ModeTab mode="manage" label="Управление" icon={<FaRuler size={11} />} />
+            </div>
 
-              {editMode === 'terrain' ? (
-                <div className="flex flex-wrap gap-2">
-                  {terrainTypes.filter(t => t.id !== 'empty').map(terrain => (
-                    <button key={terrain.id} onClick={() => setSelectedTerrainId(terrain.id)}
-                      className={`px-3 py-2 rounded-md text-white shadow ${selectedTerrainId === terrain.id ? 'ring-2 ring-black' : ''}`}
-                      style={{ backgroundColor: terrain.color }}>
-                      {terrain.name}
-                    </button>
-                  ))}
-                </div>
-              ) : editMode === 'units' ? (
+            <hr className="ech-divider mx-3" />
+
+            {/* Mode-specific tools */}
+            <div className="p-3 flex-1">
+              {editMode === 'terrain' && (
                 <div>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    <button onClick={() => setSelectedUnit(null)}
-                      className={`px-3 py-2 rounded-md bg-red-500 text-white shadow ${selectedUnit === null ? 'ring-2 ring-black' : ''}`}>
-                      Удалить юнит
-                    </button>
-                    {unitTypes.map(unit => (
-                      <button key={unit.id} onClick={() => setSelectedUnit(unit)}
-                        className={`px-3 py-2 rounded-md text-white shadow ${selectedUnit?.id === unit.id ? 'ring-2 ring-black' : ''}`}
-                        style={{ backgroundColor: unit.color }}>
-                        {unit.icon} {unit.name}
+                  <span className="ech-label mb-2 block">Тип местности</span>
+                  <div className="flex flex-col gap-0.5">
+                    {terrainTypes.filter(t => t.id !== 'empty').map(terrain => (
+                      <button
+                        key={terrain.id}
+                        onClick={() => setSelectedTerrainId(terrain.id)}
+                        className={`ech-btn w-full justify-start ${selectedTerrainId === terrain.id ? 'ech-btn-active' : ''}`}
+                      >
+                        <span className="w-3 h-3 flex-shrink-0" style={{ background: terrain.color, display: 'inline-block' }} />
+                        <span className="text-xs">{terrain.name}</span>
                       </button>
                     ))}
                   </div>
-                  <p className="text-sm text-gray-600">Выберите тип юнита и кликните по гексу для его размещения. Выберите &quot;Удалить юнит&quot; для удаления юнита с гекса.</p>
                 </div>
-              ) : editMode === 'manage' ? (
+              )}
+
+              {editMode === 'units' && (
                 <div>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    <button onClick={() => setManageAction('add')}
-                      className={`px-3 py-2 rounded-md bg-green-500 text-white shadow ${manageAction === 'add' ? 'ring-2 ring-black' : ''}`}>
-                      Добавить гексы
+                  <span className="ech-label mb-2 block">Юниты</span>
+                  <button
+                    onClick={() => setSelectedUnit(null)}
+                    className={`ech-btn w-full mb-2 ${selectedUnit === null ? 'ech-btn-active' : ''}`}
+                    style={selectedUnit === null ? {} : { borderColor: 'var(--echelon-red)', color: 'var(--echelon-red)' }}
+                  >
+                    <FaTrash size={10} /> Удалить юнит
+                  </button>
+                  <div className="flex flex-col gap-1">
+                    {unitTypes.map(unit => (
+                      <button
+                        key={unit.id}
+                        onClick={() => setSelectedUnit(unit)}
+                        className={`ech-btn w-full justify-start ${selectedUnit?.id === unit.id ? 'ech-btn-active' : ''}`}
+                      >
+                        <span className="w-3 h-3 flex-shrink-0" style={{ background: unit.color, display: 'inline-block' }} />
+                        <span className="text-xs">{unit.icon}</span>
+                        <span className="text-xs truncate">{unit.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs mt-3" style={{ color: 'var(--echelon-text-muted)' }}>
+                    Клик по гексу — разместить. &quot;Удалить&quot; — снять юнит.
+                  </p>
+                </div>
+              )}
+
+              {editMode === 'manage' && (
+                <div>
+                  <span className="ech-label mb-2 block">Действие</span>
+                  <div className="flex gap-1 mb-3">
+                    <button
+                      onClick={() => setManageAction('add')}
+                      className={`ech-btn flex-1 ${manageAction === 'add' ? 'ech-btn-active' : ''}`}
+                    >
+                      <FaPlus size={10} /> Добавить
                     </button>
-                    <button onClick={() => setManageAction('delete')}
-                      className={`px-3 py-2 rounded-md bg-red-500 text-white shadow ${manageAction === 'delete' ? 'ring-2 ring-black' : ''}`}>
-                      Удалить гексы
+                    <button
+                      onClick={() => setManageAction('delete')}
+                      className={`ech-btn flex-1 ${manageAction === 'delete' ? '' : ''}`}
+                      style={manageAction === 'delete' ? { background: 'var(--echelon-red)', borderColor: 'var(--echelon-red)', color: '#fff' } : {}}
+                    >
+                      <FaTrash size={10} /> Удалить
                     </button>
                   </div>
                   {manageAction === 'add' && (
                     <div>
-                      <p className="text-sm text-gray-600 mb-2">Кликните по полупрозрачным контурам, чтобы добавить гексы с выбранным типом местности:</p>
-                      <div className="flex flex-wrap gap-2">
+                      <span className="ech-label mb-2 block">Тип для добавления</span>
+                      <div className="flex flex-col gap-0.5">
                         {terrainTypes.filter(t => t.id !== 'empty').map(terrain => (
-                          <button key={terrain.id} onClick={() => setSelectedTerrainId(terrain.id)}
-                            className={`px-3 py-2 rounded-md text-white shadow ${selectedTerrainId === terrain.id ? 'ring-2 ring-black' : ''}`}
-                            style={{ backgroundColor: terrain.color }}>
-                            {terrain.name}
+                          <button
+                            key={terrain.id}
+                            onClick={() => setSelectedTerrainId(terrain.id)}
+                            className={`ech-btn w-full justify-start ${selectedTerrainId === terrain.id ? 'ech-btn-active' : ''}`}
+                          >
+                            <span className="w-3 h-3 flex-shrink-0" style={{ background: terrain.color, display: 'inline-block' }} />
+                            <span className="text-xs">{terrain.name}</span>
                           </button>
                         ))}
                       </div>
                     </div>
                   )}
-                  {manageAction === 'delete' && (
-                    <p className="text-sm text-gray-600">Кликните по существующему гексу, чтобы удалить его с карты.</p>
-                  )}
+                  <p className="text-xs mt-3" style={{ color: 'var(--echelon-text-muted)' }}>
+                    {manageAction === 'add' ? 'Клик по контуру — добавить гекс.' : 'Клик по гексу — удалить его.'}
+                  </p>
                 </div>
-              ) : null}
-
-              <div className="flex justify-between items-center">
-                <div className="flex space-x-2">
-                  <button onClick={increaseRadius} className="px-3 py-1 bg-green-500 hover:bg-green-600 text-white rounded">+ Радиус</button>
-                  <button onClick={decreaseRadius} className="px-3 py-1 bg-red-500 hover:bg-red-600 text-white rounded" disabled={mapRadius <= 1}>- Радиус</button>
-                </div>
-                <div className="flex flex-col items-end">
-                  <span className="text-sm text-gray-600">Радиус карты: {mapRadius}</span>
-                  <span className="text-sm text-gray-600">Макс. шашек игрока: {maxPlayerUnits}</span>
-                  <span className="text-sm text-gray-600">Количество гексов: {hexCount}</span>
-                </div>
-              </div>
+              )}
             </div>
-          </div>
 
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="flex-1 p-4 bg-white rounded-lg shadow-md">
-              <div className="flex justify-between items-center mb-2">
-                <h2 className="text-lg font-semibold">Редактор карты</h2>
-                <div className="flex gap-2">
-                  <button onClick={resetView} className="px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded text-sm">Сбросить вид</button>
-                  <span className="text-sm text-gray-500">Масштаб: {Math.round(viewTransform.scale * 100)}%</span>
-                </div>
+            <hr className="ech-divider mx-3" />
+
+            {/* Bottom actions */}
+            <div className="p-3 flex flex-col gap-1.5">
+              <span className="ech-label mb-1">Карта</span>
+              <div className="flex gap-1">
+                <button onClick={increaseRadius} className="ech-btn flex-1"><FaPlus size={9} /> Радиус</button>
+                <button onClick={decreaseRadius} className="ech-btn flex-1" disabled={mapRadius <= 1}><FaMinus size={9} /> Радиус</button>
               </div>
-              <div
-                ref={svgContainer}
-                className="relative overflow-hidden"
-                style={{ height: '70vh', cursor: isDragging ? 'grabbing' : editMode === 'manage' ? (manageAction === 'add' ? 'crosshair' : 'not-allowed') : 'grab' }}
-                onMouseDown={handleSvgMouseDown}
-                onMouseMove={handleSvgMouseMove}
-                onMouseUp={handleSvgMouseUp}
-                onMouseLeave={handleMouseUp}
+              <div className="flex gap-1">
+                <button onClick={() => setShow3DPreview(v => !v)} className="ech-btn flex-1">
+                  <FaCube size={11} /> {show3DPreview ? 'Скрыть 3D' : '3D вид'}
+                </button>
+                <button onClick={() => setShowTerrainGenerator(v => !v)} className="ech-btn flex-1">
+                  <RiEarthLine size={12} /> Генератор
+                </button>
+              </div>
+              <div className="flex gap-1">
+                <button onClick={() => setShowSizeInput(true)} className="ech-btn flex-1">
+                  <FaRuler size={10} /> Размер
+                </button>
+                <button onClick={restoreDeletedHexes} className="ech-btn flex-1">
+                  <FaUndo size={10} /> Восстановить
+                </button>
+              </div>
+
+              <label className="flex items-center gap-2 text-xs mt-1 cursor-pointer" style={{ color: 'var(--echelon-text-dim)' }}>
+                <input type="checkbox" checked={showUnits} onChange={() => setShowUnits(v => !v)}
+                  className="accent-amber-500" />
+                Показать юниты
+              </label>
+
+              <button
+                onClick={() => { setHexMap([]); setShowSizeInput(true); }}
+                className="ech-btn ech-btn-red mt-2 justify-center"
               >
-                <svg
-                  ref={svgElement}
-                  width="100%" height="100%"
-                  className="border"
-                  viewBox={viewBox}
-                  style={{ transform: `scale(${viewTransform.scale}) translate(${viewTransform.x}px, ${viewTransform.y}px)`, transformOrigin: '0 0' }}
-                >
-                  <defs>
-                    {TERRAIN_IDS_WITH_PATTERN.map(id => svgPatternDefs[id])}
-                  </defs>
-                  {editMode === 'manage' && manageAction === 'add' && renderPotentialHexes()}
-                  <g>{visibleHexes.map(renderHexSVG)}</g>
-                  <g style={{ pointerEvents: 'all' }}>{visibleHexes.map(renderUnitSVG)}</g>
-                </svg>
-                <div className="absolute bottom-2 right-2 bg-white bg-opacity-75 p-2 rounded text-xs">
-                  <p>Колесико мыши: масштаб</p>
-                  <p>Правая кнопка мыши: перемещение</p>
-                  <p>Левая кнопка мыши: {editMode === 'manage' ? (manageAction === 'add' ? 'добавление гексов' : 'удаление гексов') : 'рисование'}</p>
+                <FaTimes size={10} /> Начать заново
+              </button>
+            </div>
+          </aside>
+
+          {/* ── MAP CANVAS ── */}
+          <main className="flex-1 flex flex-col overflow-hidden">
+            <div
+              ref={svgContainer}
+              className="flex-1 relative overflow-hidden"
+              style={{
+                background: '#0a0c0b',
+                cursor: isDragging ? 'grabbing' : editMode === 'manage' ? (manageAction === 'add' ? 'crosshair' : 'not-allowed') : 'grab'
+              }}
+              onMouseDown={handleSvgMouseDown}
+              onMouseMove={handleSvgMouseMove}
+              onMouseUp={handleSvgMouseUp}
+              onMouseLeave={handleMouseUp}
+            >
+              <svg
+                ref={svgElement}
+                width="100%" height="100%"
+                viewBox={viewBox}
+                style={{ transform: `scale(${viewTransform.scale}) translate(${viewTransform.x}px, ${viewTransform.y}px)`, transformOrigin: '0 0' }}
+              >
+                <defs>
+                  {TERRAIN_IDS_WITH_PATTERN.map(id => svgPatternDefs[id])}
+                </defs>
+                {editMode === 'manage' && manageAction === 'add' && renderPotentialHexes()}
+                <g>{visibleHexes.map(renderHexSVG)}</g>
+                <g style={{ pointerEvents: 'all' }}>{visibleHexes.map(renderUnitSVG)}</g>
+              </svg>
+
+              {/* Canvas status bar */}
+              <div className="absolute bottom-0 left-0 right-0 h-7 flex items-center justify-between px-3"
+                style={{ background: 'var(--echelon-surface)', borderTop: '1px solid var(--echelon-border)', opacity: 0.9 }}>
+                <div className="flex items-center gap-4">
+                  <span className="text-xs" style={{ color: 'var(--echelon-text-muted)', fontFamily: "'IBM Plex Mono', monospace" }}>
+                    Масштаб: {Math.round(viewTransform.scale * 100)}%
+                  </span>
+                  <button onClick={resetView} className="text-xs hover:underline" style={{ color: 'var(--echelon-amber-dim)' }}>
+                    Сброс
+                  </button>
+                </div>
+                <div className="text-xs" style={{ color: 'var(--echelon-text-muted)', fontFamily: "'IBM Plex Mono', monospace" }}>
+                  ПКМ: перемещение &middot; Колесо: масштаб &middot; ЛКМ: {editMode === 'manage' ? (manageAction === 'add' ? 'добавить' : 'удалить') : 'рисовать'}
                 </div>
               </div>
             </div>
 
+            {/* 3D Preview */}
             {show3DPreview && (
-              <div className="lg:w-1/2 p-4 bg-white rounded-lg shadow-md">
-                <h2 className="text-lg font-semibold mb-2">3D Предпросмотр</h2>
-                <div ref={threeContainer} style={{ height: '400px', width: '100%' }} />
-                <div className="mt-2 text-sm text-gray-600">
-                  <p>Управление: вращение — левая кнопка мыши, перемещение — правая кнопка мыши, масштаб — колесико</p>
+              <div className="flex-shrink-0" style={{ borderTop: '1px solid var(--echelon-border)', background: 'var(--echelon-surface)' }}>
+                <div className="flex items-center justify-between px-3 h-8"
+                  style={{ borderBottom: '1px solid var(--echelon-border)' }}>
+                  <span className="ech-label">3D Предпросмотр</span>
+                  <button onClick={() => setShow3DPreview(false)} className="text-xs" style={{ color: 'var(--echelon-text-muted)' }}>
+                    <FaTimes />
+                  </button>
                 </div>
+                <div ref={threeContainer} style={{ height: '300px', width: '100%' }} />
               </div>
             )}
-          </div>
-
-          <div className="mt-4 p-4 bg-gray-700 rounded-lg">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-gray-600 p-3 rounded-lg shadow-inner">
-                <h3 className="text-white text-sm mb-2 font-semibold flex items-center">
-                  <FaFile className="mr-2" /> Работа с файлами
-                </h3>
-                <div className="grid grid-cols-2 gap-2">
-                  <label className="bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-3 px-4 rounded-lg shadow-md flex items-center justify-center cursor-pointer transition-all duration-200 transform hover:scale-105">
-                    <FaUpload className="mr-2" /> Загрузить карту
-                    <input type="file" accept=".json" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) importFromJSON(f, resetView); }} />
-                  </label>
-                  <button onClick={exportToJSON}
-                    className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-lg shadow-md flex items-center justify-center transition-all duration-200 transform hover:scale-105">
-                    <FaSave className="mr-2" /> Экспорт в JSON
-                  </button>
-                </div>
-              </div>
-
-              <div className="bg-gray-600 p-3 rounded-lg shadow-inner">
-                <h3 className="text-white text-sm mb-2 font-semibold flex items-center">
-                  <FaEye className="mr-2" /> Просмотр и генерация
-                </h3>
-                <div className="grid grid-cols-2 gap-2">
-                  <button onClick={() => setShow3DPreview(v => !v)}
-                    className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg shadow-md flex items-center justify-center transition-all duration-200 transform hover:scale-105">
-                    <FaCube className="mr-2" /> {show3DPreview ? 'Скрыть 3D' : 'Показать 3D'}
-                  </button>
-                  <button onClick={() => setShowTerrainGenerator(v => !v)}
-                    className="bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-lg shadow-md flex items-center justify-center transition-all duration-200 transform hover:scale-105">
-                    <RiEarthLine className="mr-2" /> Генератор ландшафта
-                  </button>
-                </div>
-              </div>
-
-              <div className="bg-gray-700 p-3 rounded-lg shadow-inner">
-                <h3 className="text-white text-sm mb-2 font-semibold flex items-center">
-                  <FaEdit className="mr-2" /> Изменение карты
-                </h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <button onClick={() => setShowSizeInput(true)}
-                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg shadow-md flex items-center justify-center transition-all duration-200 transform hover:scale-105">
-                    <FaRuler className="mr-2" /> Изменить размер
-                  </button>
-                  <button onClick={restoreDeletedHexes}
-                    className="bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-lg shadow-md flex items-center justify-center transition-all duration-200 transform hover:scale-105">
-                    <FaUndo className="mr-2" /> Восстановить гексы
-                  </button>
-                  <button onClick={() => { setHexMap([]); setShowSizeInput(true); }}
-                    className="bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg shadow-md flex items-center justify-center col-span-2 transform hover:scale-105">
-                    <FaTimes className="mr-2" /> Начать заново
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
+          </main>
         </div>
       )}
 
+      {/* Terrain Generator Modal */}
       {showTerrainGenerator && (
-        <TerrainGeneratorPanel
-          terrainTypes={terrainTypes}
-          onGenerateTerrain={(generatedMap: HexData[], _hexCount: number) => {
-            setHexMap(generatedMap);
-            setShowSizeInput(false);
-            setShowTerrainGenerator(false);
-          }}
-          radius={mapRadius}
-        />
+        <div className="fixed inset-0 z-50 flex items-center justify-center"
+          style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}>
+          <div className="relative">
+            <button
+              onClick={() => setShowTerrainGenerator(false)}
+              className="absolute top-3 right-3 z-10 ech-btn"
+            >
+              <FaTimes size={10} />
+            </button>
+            <TerrainGeneratorPanel
+              terrainTypes={terrainTypes}
+              onGenerateTerrain={(generatedMap: HexData[], _hexCount: number) => {
+                setHexMap(generatedMap);
+                setShowSizeInput(false);
+                setShowTerrainGenerator(false);
+              }}
+              radius={mapRadius}
+            />
+          </div>
+        </div>
       )}
     </div>
   );
