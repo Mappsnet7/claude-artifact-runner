@@ -104,6 +104,15 @@ export function use3DPreview({ hexMap, mapRadius, terrainTypes, showUnits }: Use
           ctx.strokeStyle = '#1976D2'; ctx.lineWidth = 2
           for (let i = 0; i < 5; i++) { const y = 20 + i * 20; ctx.beginPath(); ctx.moveTo(0, y); ctx.bezierCurveTo(30, y - 10, 60, y + 10, 128, y - 5); ctx.stroke() }
           break
+        case 'capture':
+          ctx.strokeStyle = '#ff5252'; ctx.lineWidth = 4
+          for (let i = -6; i < 12; i++) { ctx.beginPath(); ctx.moveTo(i * 20, 0); ctx.lineTo(i * 20 + 128, 128); ctx.stroke() }
+          ctx.strokeStyle = '#ffcdd2'; ctx.lineWidth = 2
+          ctx.beginPath(); ctx.arc(64, 64, 30, 0, Math.PI * 2); ctx.stroke()
+          ctx.beginPath(); ctx.arc(64, 64, 8, 0, Math.PI * 2); ctx.fillStyle = '#ffcdd2'; ctx.fill()
+          ctx.beginPath(); ctx.moveTo(64, 20); ctx.lineTo(64, 50); ctx.moveTo(64, 78); ctx.lineTo(64, 108)
+          ctx.moveTo(20, 64); ctx.lineTo(50, 64); ctx.moveTo(78, 64); ctx.lineTo(108, 64); ctx.stroke()
+          break
       }
       return canvas
     }

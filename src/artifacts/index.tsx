@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import TerrainGeneratorPanel from './TerrainGeneratorPanel';
 import {
   FaSave, FaUndo, FaTimes, FaUpload, FaCube,
-  FaRuler, FaEdit, FaFile, FaEye, FaPlus, FaMinus, FaTrash
+  FaRuler, FaEdit, FaPlus, FaMinus, FaTrash
 } from 'react-icons/fa';
 import { RiMapFill, RiEarthLine } from 'react-icons/ri';
 import type { HexData, TerrainType, UnitType, EditMode, ViewTransform } from './types';
@@ -59,6 +59,13 @@ const svgPatternDefs: Record<string, React.ReactNode> = {
       <path d="M0,5 Q5,3 10,5 Q15,7 20,5" stroke="#1976D2" strokeWidth="1" fill="none" />
       <path d="M0,10 Q5,8 10,10 Q15,12 20,10" stroke="#1976D2" strokeWidth="1" fill="none" />
       <path d="M0,15 Q5,13 10,15 Q15,17 20,15" stroke="#1976D2" strokeWidth="1" fill="none" />
+    </pattern>
+  ),
+  capture: (
+    <pattern key="capturePattern" id="capturePattern" patternUnits="userSpaceOnUse" width="20" height="20">
+      <rect width="20" height="20" fill="#c62828" />
+      <circle cx="10" cy="10" r="4" fill="none" stroke="#ffcdd2" strokeWidth="0.8" strokeOpacity="0.4" />
+      <circle cx="10" cy="10" r="1" fill="#ffcdd2" fillOpacity="0.4" />
     </pattern>
   ),
 };

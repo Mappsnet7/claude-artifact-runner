@@ -33,8 +33,8 @@ const DEFAULT_TERRAIN_TYPES: TerrainType[] = [
   { id: 'forest',    name: 'Лес',          color: '#33691E',    height:  0.2  },
   { id: 'swamp',     name: 'Болота',       color: '#1B5E20',    height: -0.2  },
   { id: 'buildings', name: 'Здания',       color: '#424242',    height:  0.3  },
-  { id: 'void',      name: 'Пустота',      color: '#808080',    height:  0    },
   { id: 'water',     name: 'Водоём',       color: '#2196F3',    height: -0.3  },
+  { id: 'capture',   name: 'Зона захвата',  color: '#c62828',    height:  0.05 },
   { id: 'empty',     name: 'Пустая клетка', color: 'transparent', height: 0, isEmpty: true },
 ]
 
