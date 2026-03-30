@@ -16,33 +16,27 @@ import { use3DPreview } from './use3DPreview';
 const svgPatternDefs: Record<string, React.ReactNode> = {
   field: (
     <pattern key="fieldPattern" id="fieldPattern" patternUnits="userSpaceOnUse" width="20" height="20">
-      <rect width="20" height="20" fill="#90c060" />
+      <rect width="20" height="20" fill="#4CAF50" />
       <path d="M0,10 L20,10 M10,0 L10,20" stroke="#3da142" strokeWidth="0.5" />
       <circle cx="10" cy="10" r="1" fill="#8bc34a" />
     </pattern>
   ),
   hills: (
     <pattern key="hillsPattern" id="hillsPattern" patternUnits="userSpaceOnUse" width="20" height="20">
-      <rect width="20" height="20" fill="#c8a050" />
+      <rect width="20" height="20" fill="#F9A825" />
       <path d="M0,15 Q5,5 10,15 Q15,5 20,15" stroke="#e59a14" strokeWidth="1.5" fill="none" />
-    </pattern>
-  ),
-  mountains: (
-    <pattern key="mountainsPattern" id="mountainsPattern" patternUnits="userSpaceOnUse" width="20" height="20">
-      <rect width="20" height="20" fill="#909090" />
-      <path d="M2,18 L10,4 L18,18 Z" stroke="#666" strokeWidth="1" fill="#aaa" />
     </pattern>
   ),
   forest: (
     <pattern key="forestPattern" id="forestPattern" patternUnits="userSpaceOnUse" width="20" height="20">
-      <rect width="20" height="20" fill="#2d6e1f" />
+      <rect width="20" height="20" fill="#33691E" />
       <path d="M5,15 L8,5 L11,15 Z" fill="#2c5518" />
       <path d="M12,13 L15,5 L18,13 Z" fill="#2c5518" />
     </pattern>
   ),
   swamp: (
     <pattern key="swampPattern" id="swampPattern" patternUnits="userSpaceOnUse" width="20" height="20">
-      <rect width="20" height="20" fill="#5a8c5a" />
+      <rect width="20" height="20" fill="#1B5E20" />
       <circle cx="5" cy="5" r="1.5" fill="#6c9e71" />
       <circle cx="15" cy="5" r="1" fill="#6c9e71" />
       <circle cx="10" cy="10" r="2" fill="#6c9e71" />
@@ -52,7 +46,7 @@ const svgPatternDefs: Record<string, React.ReactNode> = {
   ),
   buildings: (
     <pattern key="buildingsPattern" id="buildingsPattern" patternUnits="userSpaceOnUse" width="20" height="20">
-      <rect width="20" height="20" fill="#8c7a5a" />
+      <rect width="20" height="20" fill="#424242" />
       <rect x="2" y="2" width="7" height="7" fill="#555555" />
       <rect x="11" y="2" width="7" height="7" fill="#555555" />
       <rect x="2" y="11" width="7" height="7" fill="#555555" />
@@ -61,7 +55,7 @@ const svgPatternDefs: Record<string, React.ReactNode> = {
   ),
   water: (
     <pattern key="waterPattern" id="waterPattern" patternUnits="userSpaceOnUse" width="20" height="20">
-      <rect width="20" height="20" fill="#4090c0" />
+      <rect width="20" height="20" fill="#2196F3" />
       <path d="M0,5 Q5,3 10,5 Q15,7 20,5" stroke="#1976D2" strokeWidth="1" fill="none" />
       <path d="M0,10 Q5,8 10,10 Q15,12 20,10" stroke="#1976D2" strokeWidth="1" fill="none" />
       <path d="M0,15 Q5,13 10,15 Q15,17 20,15" stroke="#1976D2" strokeWidth="1" fill="none" />

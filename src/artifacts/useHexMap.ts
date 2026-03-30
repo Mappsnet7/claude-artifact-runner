@@ -28,21 +28,29 @@ export interface UseHexMapReturn {
 }
 
 const DEFAULT_TERRAIN_TYPES: TerrainType[] = [
-  { id: 'empty', name: 'Пусто', color: '#e8e8e8', height: 0, isEmpty: true },
-  { id: 'field', name: 'Поле', color: '#90c060', height: 0.1 },
-  { id: 'hills', name: 'Холмы', color: '#c8a050', height: 0.5 },
-  { id: 'mountains', name: 'Горы', color: '#909090', height: 1.0 },
-  { id: 'forest', name: 'Лес', color: '#2d6e1f', height: 0.3 },
-  { id: 'swamp', name: 'Болото', color: '#5a8c5a', height: 0.05 },
-  { id: 'buildings', name: 'Строения', color: '#8c7a5a', height: 0.4 },
-  { id: 'water', name: 'Вода', color: '#4090c0', height: -0.1 },
+  { id: 'field',     name: 'Поле',         color: '#4CAF50',    height:  0    },
+  { id: 'hills',     name: 'Холмы',        color: '#F9A825',    height:  0.5  },
+  { id: 'forest',    name: 'Лес',          color: '#33691E',    height:  0.2  },
+  { id: 'swamp',     name: 'Болота',       color: '#1B5E20',    height: -0.2  },
+  { id: 'buildings', name: 'Здания',       color: '#424242',    height:  0.3  },
+  { id: 'void',      name: 'Пустота',      color: '#808080',    height:  0    },
+  { id: 'water',     name: 'Водоём',       color: '#2196F3',    height: -0.3  },
+  { id: 'empty',     name: 'Пустая клетка', color: 'transparent', height: 0, isEmpty: true },
 ]
 
 const DEFAULT_UNIT_TYPES: UnitType[] = [
-  { id: 'infantry', name: 'Пехота', icon: '⚔', color: '#cc3333' },
-  { id: 'cavalry', name: 'Кавалерия', icon: '🐴', color: '#cc7700' },
-  { id: 'artillery', name: 'Артиллерия', icon: '💣', color: '#333399' },
-  { id: 'supply', name: 'Снабжение', icon: '🎒', color: '#339933' },
+  { id: 'infantry',   name: 'Пехотинец',       icon: '👤',    color: '#795548' },
+  { id: 'sailor',     name: 'Матрос',           icon: '⚓',    color: '#0D47A1' },
+  { id: 'guerrilla',  name: 'Партизан',         icon: '🔫',    color: '#006064' },
+  { id: 'cavalry',    name: 'Кавалерист',       icon: '🐎',    color: '#FF9800' },
+  { id: 'cossack',    name: 'Казак',            icon: '🏇',    color: '#BF360C' },
+  { id: 'machinegun', name: 'Пулемётчик',       icon: '🔫',    color: '#8D6E63' },
+  { id: 'tachankagun',name: 'Тачанка',          icon: '🔫+🐎', color: '#FFA000' },
+  { id: 'sniper',     name: 'Снайпер',          icon: '⌖',    color: '#263238' },
+  { id: 'cannon',     name: 'Пушка',            icon: '💣',    color: '#5D4037' },
+  { id: 'howitzer',   name: 'Гаубица',          icon: '💥',    color: '#3E2723' },
+  { id: 'armoredcar', name: 'Бронеавтомобиль',  icon: '🚙',    color: '#616161' },
+  { id: 'tank',       name: 'Танк',             icon: '🔘',    color: '#212121' },
 ]
 
 export function useHexMap(): UseHexMapReturn {

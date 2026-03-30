@@ -1,6 +1,6 @@
 import type { Point } from './types'
 
-export const HEX_SIZE = 40
+export const HEX_SIZE = 20
 
 export function getHexPosition(q: number, r: number): Point {
   return {
