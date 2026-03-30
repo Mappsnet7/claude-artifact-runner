@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import type { HexData, TerrainType, UnitType } from './types'
 import { generateHexCoords, hexKey } from './hexUtils'
 import { exportMapToJSON, importMapFromJSON } from '../lib/jsonUtils'
@@ -56,7 +56,7 @@ const DEFAULT_UNIT_TYPES: UnitType[] = [
 export function useHexMap(): UseHexMapReturn {
   const [hexMap, setHexMap] = useState<HexData[]>([])
   const [mapRadius, setMapRadius] = useState(5)
-  const [hexCount, setHexCount] = useState(0)
+  const hexCount = useMemo(() => hexMap.filter(h => h.terrainType !== 'empty').length, [hexMap])
   const [maxPlayerUnits, setMaxPlayerUnits] = useState(8)
   const [deletedHexes, setDeletedHexes] = useState<HexData[]>([])
   const [showSizeInput, setShowSizeInput] = useState(true)
@@ -81,7 +81,6 @@ export function useHexMap(): UseHexMapReturn {
           return existing ?? { q, r: rv, s, terrainType: ft.id, color: ft.color, height: ft.height }
         })
         setHexMap(newMap)
-        setHexCount(newMap.filter(h => h.terrainType !== 'empty').length)
         setMapRadius(r)
       }, 0)
     },
@@ -106,7 +105,6 @@ export function useHexMap(): UseHexMapReturn {
       }))
 
       setHexMap(newMap)
-      setHexCount(newMap.length)
       setShowSizeInput(false)
       onViewReset?.()
     },
@@ -138,7 +136,6 @@ export function useHexMap(): UseHexMapReturn {
       }
     })
     setHexMap(updatedMap)
-    setHexCount(updatedMap.filter(h => h.terrainType !== 'empty').length)
     setDeletedHexes([])
     alert(`Восстановлено ${restoredCount} гексов.`)
   }, [hexMap, deletedHexes])
@@ -165,7 +162,6 @@ export function useHexMap(): UseHexMapReturn {
         setHexMap(resolvedMap)
         setMapRadius(data.mapRadius)
         if (data.maxPlayerUnits !== undefined) setMaxPlayerUnits(data.maxPlayerUnits)
-        setHexCount(resolvedMap.filter(h => h.terrainType !== 'empty').length)
         setShowSizeInput(false)
         onViewReset?.()
       })
